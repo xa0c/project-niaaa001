@@ -2,6 +2,7 @@ import readline
 import core
 from contacts import AddressBook
 
+FILEPATH = "addressbook.pkl"
 MSG_HELP = """\
 DESCRIPTION:
     This script provides CLI for contact management.
@@ -78,7 +79,7 @@ def parse_input(user_input: str) -> tuple[str, dict[str, str]]:
 
 def main():
     print("Welcome to the assistant bot!\nType `help` to learn more about available commands.")
-    book = AddressBook()
+    book = core.load_data(FILEPATH)
 
     # Store functions for easier command handling
     cmd_funcs = {
@@ -108,6 +109,7 @@ def main():
         # Handle commands
         match cmd:
             case "exit" | "close":
+                core.save_data(book, FILEPATH)
                 print("Exiting program. Good bye!")
                 break
             case "hello":

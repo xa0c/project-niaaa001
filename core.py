@@ -1,4 +1,5 @@
 import functools
+import pickle
 from collections.abc import Callable
 from contacts import AddressBook, Record, InvalidPhoneFormatError, InvalidDateFormatError
 
@@ -283,3 +284,42 @@ def birthdays(args: dict[str, str], book: AddressBook) -> str:
     result = book.get_upcoming_birthdays(7)
 
     return "\n".join(row["congratulation_date"] + ": " + row["name"] for row in result)
+
+
+def load_data(path: str) -> AddressBook:
+    """Load AddressBook object from the Pickle-serialized data file.
+
+    Args:
+        path (str): Path to the data file.
+
+    Returns:
+        AddressBook: Restored object or empty on file access error.
+    """
+    try:
+        with open(path, "rb") as fh:
+            return pickle.load(fh)
+    except FileNotFoundError:
+        print(f"INFO: File `{path}` wasn't found. Starting with an empty AdressBook.")
+    except OSError:
+        print(
+            f"ERROR: There was a problem reading `{path}` file. "
+            "Starting with an empty AddressBook.\n"
+            "Be careful, since your existing AddressBook may be overwritten."
+        )
+    return AddressBook()
+
+
+def save_data(book: AddressBook, path: str):
+    """Save AddressBook object to the Pickle-serialized data file.
+
+    Args:
+        book (AddressBook): Source object.
+        path (str): Path to the data file.
+    """
+    try:
+        with open(path, "wb") as fh:
+            pickle.dump(book, fh)
+    except OSError:
+        print(f"ERROR: Failed to save AddressBook in `{path}` file.")
+    else:
+        print(f"AddressBook was saved in `{path}` file.")
