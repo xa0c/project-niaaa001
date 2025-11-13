@@ -1,7 +1,9 @@
 from collections import UserDict
 from datetime import datetime, date
+import re
 
 BIRTHDAY_FORMAT = "%d.%m.%Y"
+EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
 
 
 def is_leap_year(year: int) -> bool:
@@ -19,7 +21,7 @@ def is_leap_year(year: int) -> bool:
 class InvalidPhoneFormatError(ValueError):
     """Custom exception for invalid phone format."""
 
-    def __init__(self, message="Invalid phone format: must be 10 ASCII digits."):
+    def __init__(self, message="Invalid phone format: must be 10 ASCII digits starting with 0."):
         super().__init__(message)
 
 
@@ -27,6 +29,21 @@ class InvalidDateFormatError(ValueError):
     """Custom exception for invalid date format."""
 
     def __init__(self, message="Invalid date format: must be `DD.MM.YYYY`."):
+        super().__init__(message)
+
+
+class InvalidNameFormatError(ValueError):
+    def __init__(self, message="Invalid name format: length must be <= 100."):
+        super().__init__(message)
+
+
+class InvalidAddressFormatError(ValueError):
+    def __init__(self, message="Invalid address format: length must be <= 300."):
+        super().__init__(message)
+
+
+class InvalidEmailFormatError(ValueError):
+    def __init__(self, message="Invalid email format: must match pattern and length <= 254."):
         super().__init__(message)
 
 
@@ -46,7 +63,14 @@ class Field:
 
 class Name(Field):
     """Field class for storing Record name field."""
-    pass
+
+    def __init__(self, value: str):
+        self.set_value(value)
+
+    def set_value(self, value: str):
+        if len(value) > 100:
+            raise InvalidNameFormatError
+        self.value = value
 
 
 class Phone(Field):
@@ -78,7 +102,7 @@ class Phone(Field):
         Raises:
             InvalidPhoneFormatError: If phone format is invalid.
         """
-        if len(value) != 10 or not (value.isascii and value.isdigit()):
+        if len(value) != 10 or not (value.isascii() and value.isdigit()) or value[0] != '0':
             raise InvalidPhoneFormatError
         self.value = value
 
@@ -106,6 +130,27 @@ class Birthday(Field):
             raise InvalidDateFormatError from e
 
 
+class Address(Field):
+
+    def __init__(self, value: str):
+        self.set_value(value)
+
+    def set_value(self, value: str):
+        if len(value) > 300:
+            raise InvalidAddressFormatError
+        self.value = value
+
+class Email(Field):
+
+    def __init__(self, value: str):
+        self.set_value(value)
+
+    def set_value(self, value: str):
+        if len(value) > 254 or not EMAIL_PATTERN.match(value):
+            raise InvalidEmailFormatError
+        self.value = value
+
+
 class Record:
     """Record for contact info management.
 
@@ -117,6 +162,8 @@ class Record:
         self.name = Name(name)
         self.phones = []
         self.birthday = None
+        self.address = None
+        self.email = None
 
     def __str__(self):
         return f"Contact name: {self.name}, phones: {'; '.join(p.value for p in self.phones)}"

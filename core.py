@@ -1,7 +1,11 @@
 import functools
 import pickle
 from collections.abc import Callable
-from contacts import AddressBook, Record, InvalidPhoneFormatError, InvalidDateFormatError
+from contacts import (
+    AddressBook, Record, InvalidPhoneFormatError, InvalidDateFormatError,
+    InvalidNameFormatError, InvalidAddressFormatError, InvalidEmailFormatError,
+    Address, Email, Birthday
+)
 
 
 class InvalidCmdArgsCountError(ValueError):
@@ -40,7 +44,8 @@ def input_error(func: Callable) -> Callable:
             return func(*args, **kwargs)
         except (
             InvalidCmdArgsCountError, RecordNotExists, FieldNotExists, InvalidPhoneFormatError,
-            InvalidDateFormatError
+            InvalidDateFormatError, InvalidNameFormatError, InvalidAddressFormatError,
+            InvalidEmailFormatError
         ) as e:
             return f"ERROR: {e.args[0]} Try again."
     return inner
@@ -124,33 +129,273 @@ def change_contact(args: dict[str, str], book: AddressBook) -> str:
 
 
 @input_error
-def show_phone(args: dict[str, str], book: AddressBook) -> str:
-    """Return all phone fields for the specified Record.
+def phone_command(args: dict[str, str], book: AddressBook) -> str:
+    """Handle phone command: show, add, edit, or delete phones.
 
     Args:
         args (dict[str, str]): Dict with raw cmd arguments.
-            Keys: name.
+            Keys: name, value (optional for add), old_value (optional for change/delete),
+            new_value (optional for change/delete).
         book (AddressBook): AddressBook object.
 
     Returns:
-        str: Multiline string with phone numbers.
+        str: Operation result message or phone numbers.
 
     Raises:
         InvalidCmdArgsCountError: If command has invalid argument count.
         RecordNotExists: If specified Record doesn't exist.
+        FieldNotExists: If specified phone field doesn't exist.
+        InvalidPhoneFormatError: If phone number has invalid format.
     """
     try:
-        name, = args.values()
+        name = args.get("name")
+        value = args.get("value")
+        old_value = args.get("old_value")
+        new_value = args.get("new_value")
     except:
+        raise InvalidCmdArgsCountError
+
+    if name is None:
         raise InvalidCmdArgsCountError
 
     record = book.find(name)
 
-    # Check if specified Record exists
+    if value is None and old_value is None:
+        if record is None:
+            raise RecordNotExists
+        phones = "\n".join(phone.value for phone in record.phones)
+        return phones if phones else "No phones found."
+
+    if value is not None and old_value is None:
+        if record is None:
+            record = Record(name)
+            record.add_phone(value)
+            book.add_record(record)
+            return f"Added '{value}' phone to the new Record."
+        else:
+            record.add_phone(value)
+            return f"Added '{value}' phone to the Record."
+
+    if old_value is not None and new_value == "":
+        if record is None:
+            raise RecordNotExists
+        phone = record.find_phone(old_value)
+        if phone is None:
+            raise FieldNotExists
+        record.remove_phone(old_value)
+        return f"Deleted phone '{old_value}' from the Record."
+
+    if old_value is not None and new_value is not None and new_value != "":
+        if record is None:
+            raise RecordNotExists
+        phone = record.find_phone(old_value)
+        if phone is None:
+            raise FieldNotExists
+        phone.set_value(new_value)
+        return f"Changed phone from '{old_value}' to '{new_value}'."
+
+    raise InvalidCmdArgsCountError
+
+
+@input_error
+def address_command(args: dict[str, str], book: AddressBook) -> str:
+    """Handle address command: show, set, or unset address.
+
+    Args:
+        args (dict[str, str]): Dict with raw cmd arguments.
+            Keys: name, value (optional).
+        book (AddressBook): AddressBook object.
+
+    Returns:
+        str: Operation result message or address value.
+
+    Raises:
+        InvalidCmdArgsCountError: If command has invalid argument count.
+        RecordNotExists: If specified Record doesn't exist.
+        InvalidAddressFormatError: If address format is invalid.
+    """
+    try:
+        name = args.get("name")
+        value = args.get("value")
+    except:
+        raise InvalidCmdArgsCountError
+
+    if name is None:
+        raise InvalidCmdArgsCountError
+
+    record = book.find(name)
+
     if record is None:
         raise RecordNotExists
 
-    return "\n".join(phone.value for phone in record.phones)
+    if value is None:
+        address = getattr(record, 'address', None)
+        if address is None:
+            return "No address set."
+        return address.value
+
+    if value == "":
+        record.address = None
+        return "Unset address."
+
+    record.address = Address(value)
+    return f"Set address to '{value}'."
+
+
+@input_error
+def email_command(args: dict[str, str], book: AddressBook) -> str:
+    """Handle email command: show, set, or unset email.
+
+    Args:
+        args (dict[str, str]): Dict with raw cmd arguments.
+            Keys: name, value (optional).
+        book (AddressBook): AddressBook object.
+
+    Returns:
+        str: Operation result message or email value.
+
+    Raises:
+        InvalidCmdArgsCountError: If command has invalid argument count.
+        RecordNotExists: If specified Record doesn't exist.
+        InvalidEmailFormatError: If email format is invalid.
+    """
+    try:
+        name = args.get("name")
+        value = args.get("value")
+    except:
+        raise InvalidCmdArgsCountError
+
+    if name is None:
+        raise InvalidCmdArgsCountError
+
+    record = book.find(name)
+
+    if record is None:
+        raise RecordNotExists
+
+    if value is None:
+        email = getattr(record, 'email', None)
+        if email is None:
+            return "No email set."
+        return email.value
+
+    if value == "":
+        record.email = None
+        return "Unset email."
+
+    record.email = Email(value)
+    return f"Set email to '{value}'."
+
+
+@input_error
+def birthday_command(args: dict[str, str], book: AddressBook) -> str:
+    """Handle birthday command: show, set, or unset birthday.
+
+    Args:
+        args (dict[str, str]): Dict with raw cmd arguments.
+            Keys: name, value (optional).
+        book (AddressBook): AddressBook object.
+
+    Returns:
+        str: Operation result message or birthday value.
+
+    Raises:
+        InvalidCmdArgsCountError: If command has invalid argument count.
+        RecordNotExists: If specified Record doesn't exist.
+        InvalidDateFormatError: If birthday format is invalid.
+    """
+    try:
+        name = args.get("name")
+        value = args.get("value")
+    except:
+        raise InvalidCmdArgsCountError
+
+    if name is None:
+        raise InvalidCmdArgsCountError
+
+    record = book.find(name)
+
+    if record is None:
+        raise RecordNotExists
+
+    if value is None:
+        birthday = getattr(record, 'birthday', None)
+        if birthday is None:
+            return "No birthday set."
+        return str(birthday)
+
+    if value == "":
+        record.birthday = None
+        return "Unset birthday."
+
+    record.birthday = Birthday(value)
+    return f"Set birthday to '{value}'."
+
+
+@input_error
+def name_command(args: dict[str, str], book: AddressBook) -> str:
+    """Handle name command: show card, rename record, or delete record.
+
+    Args:
+        args (dict[str, str]): Dict with raw cmd arguments.
+            Keys: name, value (optional).
+        book (AddressBook): AddressBook object.
+
+    Returns:
+        str: Operation result message or Record card.
+
+    Raises:
+        InvalidCmdArgsCountError: If command has invalid argument count.
+        RecordNotExists: If specified Record doesn't exist.
+        InvalidNameFormatError: If new name format is invalid.
+    """
+    try:
+        name = args.get("name")
+        value = args.get("value")
+    except:
+        raise InvalidCmdArgsCountError
+
+    if name is None:
+        raise InvalidCmdArgsCountError
+
+    record = book.find(name)
+
+    if value is None:
+        if record is None:
+            raise RecordNotExists
+        src = AddressBook()
+        src.add_record(record)
+        output = ""
+        for rec_name, rec in src.items():
+            output += "/" + '═' * 30 + "\\\n"
+            output += "│" + f" Name: {rec_name}".ljust(30) + "│\n"
+            if rec.birthday is not None:
+                output += "│" + f" Birthday: {rec.birthday}".ljust(30) + "│\n"
+            output += "├" + "─" * 30 + "┤\n"
+            output += "│" + "Phones".center(30) + "│\n"
+            output += "│" + "-" * 30 + "│\n"
+            for phone in rec.phones:
+                output += "│ " + str(phone).ljust(29) + "│\n"
+            output += "└" + "─" * 30 + "┘\n"
+        return output
+
+    if value == "":
+        if record is None:
+            raise RecordNotExists
+        book.delete(name)
+        return f"Deleted Record '{name}'."
+
+    if record is None:
+        raise RecordNotExists
+
+    if book.find(value) is not None:
+        return f"ERROR: Record with name '{value}' already exists. Try again."
+
+    old_name = name
+    record.name.set_value(value)
+    del book.data[old_name]
+    book.data[value] = record
+    return f"Renamed Record from '{old_name}' to '{value}'."
 
 
 @input_error

@@ -1,5 +1,8 @@
 import csv
-import readline
+try:
+    import readline
+except ImportError:
+    pass
 import core
 from contacts import AddressBook
 
@@ -65,10 +68,52 @@ def parse_input(user_input: str) -> tuple[str, dict[str, str]]:
             if len(args) != 3:
                 raise ValueError(MSG_BAD_ARG_COUNT)
             args = {"name": args[0], "old_value": args[1], "new_value": args[2]}
-        case "phone" | "show-birthday":
+        case "phone":
+            match len(args):
+                case 1:
+                    args = {"name": args[0]}
+                case 2:
+                    args = {"name": args[0], "value": args[1]}
+                case 3:
+                    args = {"name": args[0], "old_value": args[1], "new_value": args[2]}
+                case _:
+                    raise ValueError(MSG_BAD_ARG_COUNT)
+        case "show-birthday":
             if len(args) != 1:
                 raise ValueError(MSG_BAD_ARG_COUNT)
             args = {"name": args[0]}
+        case "name":
+            match len(args):
+                case 1:
+                    args = {"name": args[0], "value": None}
+                case 2:
+                    args = {"name": args[0], "value": args[1]}
+                case _:
+                    raise ValueError(MSG_BAD_ARG_COUNT)
+        case "address":
+            match len(args):
+                case 1:
+                    args = {"name": args[0], "value": None}
+                case 2:
+                    args = {"name": args[0], "value": args[1]}
+                case _:
+                    raise ValueError(MSG_BAD_ARG_COUNT)
+        case "email":
+            match len(args):
+                case 1:
+                    args = {"name": args[0], "value": None}
+                case 2:
+                    args = {"name": args[0], "value": args[1]}
+                case _:
+                    raise ValueError(MSG_BAD_ARG_COUNT)
+        case "birthday":
+            match len(args):
+                case 1:
+                    args = {"name": args[0], "value": None}
+                case 2:
+                    args = {"name": args[0], "value": args[1]}
+                case _:
+                    raise ValueError(MSG_BAD_ARG_COUNT)
         case "all":
             match len(args):
                 case 0:
@@ -92,7 +137,11 @@ def main():
     cmd_funcs = {
         "add": core.add_contact,
         "change": core.change_contact,
-        "phone": core.show_phone,
+        "phone": core.phone_command,
+        "name": core.name_command,
+        "address": core.address_command,
+        "email": core.email_command,
+        "birthday": core.birthday_command,
         "all": core.render_record_table,
         "add-birthday": core.add_birthday,
         "show-birthday": core.show_birthday,
@@ -124,8 +173,8 @@ def main():
             case "help":
                 print(MSG_HELP)
             case (
-                "add" | "change" | "phone" | "all" | "add-birthday" | "show-birthday" |
-                "birthdays"
+                "add" | "change" | "phone" | "name" | "address" | "email" | "birthday" | "all" |
+                "add-birthday" | "show-birthday" | "birthdays"
             ):
                 print(cmd_funcs[cmd](args, book))
             case _:
