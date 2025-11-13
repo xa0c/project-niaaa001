@@ -1,3 +1,4 @@
+import csv
 import readline
 import core
 from contacts import AddressBook
@@ -52,28 +53,34 @@ def parse_input(user_input: str) -> tuple[str, dict[str, str]]:
     if not user_input:
         return "", {}
 
-    cmd, *args = user_input.strip().split()
+    reader = csv.reader([user_input.strip()], delimiter=" ")
+    cmd, *args = next(reader)
     cmd = cmd.lower()
     match cmd:
         case "add" | "add-birthday":
-            if len(args) < 2:
+            if len(args) != 2:
                 raise ValueError(MSG_BAD_ARG_COUNT)
-            args = {"name": " ".join(args[:-1]), "value": args[-1]}
+            args = {"name": args[0], "value": args[1]}
         case "change":
-            if len(args) < 3:
+            if len(args) != 3:
                 raise ValueError(MSG_BAD_ARG_COUNT)
-            args = {"name": " ".join(args[:-2]), "old_value": args[-2], "new_value": args[-1]}
+            args = {"name": args[0], "old_value": args[1], "new_value": args[2]}
         case "phone" | "show-birthday":
-            if len(args) < 1:
+            if len(args) != 1:
                 raise ValueError(MSG_BAD_ARG_COUNT)
-            args = {"name": " ".join(args)}
+            args = {"name": args[0]}
         case "all":
-            args = {"name": None} if len(args) == 0 else {"name": " ".join(args)}
+            match len(args):
+                case 0:
+                    args = {"name": None}
+                case 1:
+                    args = {"name": args[0]}
+                case _:
+                    raise ValueError(MSG_BAD_ARG_COUNT)
         case "birthdays":
             if len(args) != 0:
                 raise ValueError(MSG_BAD_ARG_COUNT)
             args = {}
-
     return cmd, args
 
 
