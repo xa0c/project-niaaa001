@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 from contacts import AddressBook, Record
 from contacts import InvalidPropertyFormatError
+from notes import NoteBook, Note
 
 
 class InvalidCmdArgsCountError(ValueError):
@@ -74,7 +75,8 @@ def input_error(func: Callable) -> Callable:
             return func(*args, **kwargs)
         except (
             InvalidCmdArgsCountError, RecordExistsError, RecordNotExistsError, FieldNotExistsError,
-            InvalidPropertyFormatError, InvalidCmdArgTypeError
+            InvalidPropertyFormatError, InvalidCmdArgTypeError, NoteNotExistsError, TagNotExistsError,
+            ValueError
         ) as e:
             return f"ERROR: {e.args[0]} Try again."
     return inner
@@ -345,7 +347,7 @@ def handle_birthdays(args: list[str], book: AddressBook) -> str:
     output_list = []
     for row in result:
         s = str(row["congratulation_date"])
-        s += f" (in {row["wait_days_count"]} "
+        s += f" (in {row['wait_days_count']} "
         s += "day): " if row["wait_days_count"] == 1 else "days): "
         s += str(row["record"].name)
         output_list.append(s)
@@ -386,46 +388,254 @@ def handle_find_records(args: list[str], book: AddressBook) -> str:
     return output
 
 
-@file_error
-def load_data(path: str) -> AddressBook:
-    """Load AddressBook object from the Pickle-serialized data file.
+# Note commands
+class NoteNotExistsError(ValueError):
+    """Custom exception if specified Note doesn't exist."""
+
+    def __init__(self, message="Specified Note doesn't exist."):
+        super().__init__(message)
+
+
+class TagNotExistsError(ValueError):
+    """Custom exception if specified Tag doesn't exist."""
+
+    def __init__(self, message="Specified Tag doesn't exist."):
+        super().__init__(message)
+
+
+@input_error
+def handle_new_note(args: list[str], notebook: NoteBook) -> str:
+    """Create new Note.
+
+    Args:
+        args (list[str]): Command arguments. Expected: [body]
+        notebook (NoteBook): NoteBook object.
+
+    Returns:
+        str: Operation result message.
+
+    Raises:
+        InvalidCmdArgsCountError: If command has invalid argument count.
+    """
+    try:
+        body, *_ = args
+    except:
+        raise InvalidCmdArgsCountError
+
+    if body is None:
+        raise InvalidCmdArgsCountError
+
+    note = Note(body)
+    notebook.add_note(note)
+    note_id = len(notebook) - 1
+    return f"Created new Note with ID {note_id}."
+
+
+@input_error
+def handle_notes(args: list[str], notebook: NoteBook) -> str:
+    """Handle notes command: show all, show one, update, or delete.
+
+    Args:
+        args (list[str]): Command arguments. Expected: [] or [id] or [id, body] or [id, ""]
+        notebook (NoteBook): NoteBook object.
+
+    Returns:
+        str: Operation result message or notes list.
+
+    Raises:
+        InvalidCmdArgsCountError: If command has invalid argument count.
+        NoteNotExistsError: If specified Note doesn't exist.
+        InvalidCmdArgTypeError: If ID is not a valid integer.
+    """
+    try:
+        note_id_arg = args[0] if args else None
+    except:
+        raise InvalidCmdArgsCountError
+
+    # Show all notes with IDs
+    if note_id_arg is None:
+        if len(notebook) == 0:
+            return "No notes found."
+        output = ""
+        for i, note in enumerate(notebook):
+            tags_str = ', '.join(note.tags) if note.tags else "no tags"
+            output += f"[{i}] {note.body} [{tags_str}]\n"
+        return output.rstrip()
+
+    # Show, update, or delete note
+    try:
+        note_id = int(note_id_arg)
+    except ValueError:
+        raise InvalidCmdArgTypeError("Note ID must be an integer.")
+
+    if note_id < 0 or note_id >= len(notebook):
+        raise NoteNotExistsError
+
+    note = notebook[note_id]
+
+    # Join all arguments after note_id (filtering out None) to form body
+    body_parts = [arg for arg in args[1:] if arg is not None]
+    body = ' '.join(body_parts) if body_parts else None
+
+    # Show note
+    if body is None:
+        tags_str = ', '.join(note.tags) if note.tags else "no tags"
+        return f"[{note_id}] {note.body} [{tags_str}]"
+
+    # Delete note
+    if body == "":
+        notebook.delete_note(note_id)
+        return f"Deleted Note with ID {note_id}."
+
+    # Update note
+    notebook.update_note(note_id, body)
+    return f"Updated Note with ID {note_id}."
+
+
+@input_error
+def handle_tag(args: list[str], notebook: NoteBook) -> str:
+    """Handle tag command: show, add, replace, or delete tags.
+
+    Args:
+        args (list[str]): Command arguments. Expected: [note_id] or [note_id, tag] or
+            [note_id, old_tag, new_tag] or [note_id, tag, ""]
+        notebook (NoteBook): NoteBook object.
+
+    Returns:
+        str: Operation result message or tags list.
+
+    Raises:
+        InvalidCmdArgsCountError: If command has invalid argument count.
+        NoteNotExistsError: If specified Note doesn't exist.
+        TagNotExistsError: If specified Tag doesn't exist.
+        InvalidCmdArgTypeError: If ID is not a valid integer.
+    """
+    try:
+        note_id_arg, tag_arg, new_tag_arg, *_ = args
+    except:
+        raise InvalidCmdArgsCountError
+
+    if note_id_arg is None:
+        raise InvalidCmdArgsCountError
+
+    try:
+        note_id = int(note_id_arg)
+    except ValueError:
+        raise InvalidCmdArgTypeError("Note ID must be an integer.")
+
+    if note_id < 0 or note_id >= len(notebook):
+        raise NoteNotExistsError
+
+    note = notebook[note_id]
+
+    # Show all tags
+    if tag_arg is None:
+        if not note.tags:
+            return "No tags found."
+        return ', '.join(note.tags)
+
+    # Add tag (validation happens in note.add_tag)
+    if new_tag_arg is None:
+        note.add_tag(tag_arg)
+        return f"Added tag '{tag_arg}' to Note {note_id}."
+
+    # Delete tag
+    if new_tag_arg == "":
+        if tag_arg not in note.tags:
+            raise TagNotExistsError
+        note.remove_tag(tag_arg)
+        return f"Deleted tag '{tag_arg}' from Note {note_id}."
+
+    # Replace tag (validation happens in note.replace_tag)
+    if tag_arg not in note.tags:
+        raise TagNotExistsError
+    note.replace_tag(tag_arg, new_tag_arg)
+    return f"Replaced tag '{tag_arg}' with '{new_tag_arg}' in Note {note_id}."
+
+
+@input_error
+def handle_find_notes(args: list[str], notebook: NoteBook) -> str:
+    """Search notes by keyword.
+
+    Args:
+        args (list[str]): Command arguments. Expected: [keyword]
+        notebook (NoteBook): NoteBook object.
+
+    Returns:
+        str: Found notes list.
+
+    Raises:
+        InvalidCmdArgsCountError: If command has invalid argument count.
+    """
+    try:
+        keyword, *_ = args
+    except:
+        raise InvalidCmdArgsCountError
+
+    if keyword is None:
+        raise InvalidCmdArgsCountError
+
+    found_notes = notebook.find(keyword)
+
+    if not found_notes:
+        return f"No notes found with keyword '{keyword}'."
+
+    output = ""
+    for note in found_notes:
+        note_id = notebook.data.index(note)
+        tags_str = ', '.join(note.tags) if note.tags else "no tags"
+        output += f"[{note_id}] {note.body} [{tags_str}]\n"
+    return output.rstrip()
+
+
+def load_store(path: str) -> tuple[AddressBook, NoteBook]:
+    """Load AddressBook and NoteBook objects from the Pickle-serialized data file.
 
     Args:
         path (str): Path to the data file.
 
     Returns:
-        AddressBook: Restored object or empty on file access error.
+        tuple[AddressBook, NoteBook]: Restored objects or empty objects on file access error.
     """
     try:
         with open(path, "rb") as fh:
-            return pickle.load(fh)
-    except FileNotFoundError as e:
-        raise FileNotFoundError(
-            f"INFO: File `{path}` wasn't found. Starting with an empty AdressBook."
-        ) from e
-    except OSError as e:
-        raise OSError(
+            data = pickle.load(fh)
+            book = data.get("book", AddressBook())
+            notebook = data.get("notebook", NoteBook())
+            return book, notebook
+    except FileNotFoundError:
+        print(f"INFO: File `{path}` wasn't found. Starting with empty AddressBook and NoteBook.")
+    except OSError:
+        print(
             f"ERROR: There was a problem reading `{path}` file. "
-            "Starting with an empty AddressBook.\n"
-            "Be careful, since your existing AddressBook may be overwritten."
-        ) from e
-    return AddressBook()
+            "Starting with empty AddressBook and NoteBook.\n"
+            "Be careful, since your existing data may be overwritten."
+        )
+    except (KeyError, TypeError):
+        print(
+            f"ERROR: File `{path}` has invalid format. "
+            "Starting with empty AddressBook and NoteBook.\n"
+            "Be careful, since your existing data may be overwritten."
+        )
+    return AddressBook(), NoteBook()
 
 
 @file_error
-def save_data(book: AddressBook, path: str) -> str:
-    """Save AddressBook object to the Pickle-serialized data file.
+def save_store(book: AddressBook, notebook: NoteBook, path: str) -> str:
+    """Save AddressBook and NoteBook objects to the Pickle-serialized data file.
 
     Args:
-        book (AddressBook): Source object.
+        book (AddressBook): AddressBook object to save.
+        notebook (NoteBook): NoteBook object to save.
         path (str): Path to the data file.
 
     Returns:
         str: Operation result message.
     """
     try:
+        data = {"book": book, "notebook": notebook}
         with open(path, "wb") as fh:
-            pickle.dump(book, fh)
+            pickle.dump(data, fh)
     except OSError as e:
-        raise OSError(f"ERROR: Failed to save AddressBook in `{path}` file.") from e
-    return f"AddressBook was saved in `{path}` file."
+        raise OSError(f"ERROR: Failed to save data in `{path}` file.") from e
+    return f"Data was saved in `{path}` file."
