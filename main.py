@@ -26,8 +26,9 @@ USAGE:
         Add birthday for the specified person. Create person if missing.
     - show-birthday <person>
         Print person's birthday.
-    - birthdays
-        Print list of congratulation dates for persons which birthdays occur in next 7 days.
+    - birthdays [ <days> ]
+        If days is specified, print list of congratulation dates for persons which birthdays are \
+        within specified period. Otherwise defaults to 7 days period.
     - help
         Prints this message.
     - hello
@@ -50,7 +51,7 @@ CMD_CFG = {
     "email": (1, 2),
     "birthday": (1, 2),
     "all": (0, 1),
-    "birthdays": (0, 0),
+    "birthdays": (0, 1),
 }
 
 

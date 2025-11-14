@@ -370,8 +370,8 @@ def render_record_table(args: dict[str, str], book: AddressBook) -> str:
 
 
 @input_error
-def birthdays(args: dict[str, str], book: AddressBook) -> str:
-    """Return list of dictionaries with Record name and congrats date.
+def birthdays(args: list[str], book: AddressBook) -> str:
+    """Output table of records with upcoming birthdays.
 
     Args:
         book (AddressBook): AddressBook object.
@@ -379,9 +379,22 @@ def birthdays(args: dict[str, str], book: AddressBook) -> str:
     Returns:
         str: Multiline string with Record names and congrat dates.
     """
-    result = book.get_upcoming_birthdays(7)
+    try:
+        days, *_ = args
+        days = 7 if days is None else int(days)
+    except:
+        raise InvalidCmdArgsCountError
 
-    return "\n".join(row["congratulation_date"] + ": " + row["name"] for row in result)
+    result = book.get_upcoming_birthdays(days)
+
+    output_list = []
+    for row in result:
+        s = str(row["congratulation_date"])
+        s += f" (in {row["wait_days_count"]} "
+        s += "day): " if row["wait_days_count"] == 1 else "days): "
+        s += str(row["record"].name)
+        output_list.append(s)
+    return "\n".join(output_list)
 
 
 def load_data(path: str) -> AddressBook:
