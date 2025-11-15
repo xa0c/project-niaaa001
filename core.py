@@ -352,11 +352,17 @@ def handle_all(args: list[str], book: AddressBook) -> str:
             raise RecordNotExists
         return render_record_table(record)
 
-    # Render all Record "cards"
-    output = ""
+    # Render all Records in one table
+    table = PrettyTable()
+    table.field_names = ["Name", "Birthday", "Address", "Email", "Phones"]
     for record in book.values():
-        output += render_record_table(record)
-    return output
+        name_str = str(record.name)
+        birthday_str = str(record.birthday) if record.birthday else ""
+        address_str = str(record.address) if record.address else ""
+        email_str = str(record.email) if record.email else ""
+        phones_str = ", ".join(phone.value for phone in record.phones) if record.phones else ""
+        table.add_row([name_str, birthday_str, address_str, email_str, phones_str])
+    return table
 
 
 def render_record_table(record: Record) -> str:
@@ -421,6 +427,7 @@ def handle_birthdays(args: list[str], book: AddressBook) -> str:
         table.add_row([row["record"].name, str(row["congratulation_date"]), row["wait_days_count"]])
     return table
 
+
 @input_error
 def handle_find(args: list[str], book: AddressBook) -> str:
     """Handle find command.
@@ -447,11 +454,17 @@ def handle_find(args: list[str], book: AddressBook) -> str:
     if not records:
         return f"No Record matches for the `{search_value}` keyword."
 
-    # Render all matched Record "cards"
-    output = ""
+    # Render all matched Records in one table
+    table = PrettyTable()
+    table.field_names = ["Name", "Birthday", "Address", "Email", "Phones"]
     for record in records:
-        output += render_record_table(record)
-    return output
+        name_str = str(record.name)
+        birthday_str = str(record.birthday) if record.birthday else ""
+        address_str = str(record.address) if record.address else ""
+        email_str = str(record.email) if record.email else ""
+        phones_str = ", ".join(phone.value for phone in record.phones) if record.phones else ""
+        table.add_row([name_str, birthday_str, address_str, email_str, phones_str])
+    return table
 
 
 def load_data(path: str) -> AddressBook:
