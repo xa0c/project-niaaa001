@@ -52,6 +52,7 @@ CMD_CFG = {
     "birthday": (1, 2),
     "all": (0, 1),
     "birthdays": (0, 1),
+    "find": (1, 1),
 }
 
 
@@ -97,6 +98,7 @@ def main():
         "birthday": core.handle_birthday,
         "all": core.render_record_table,
         "birthdays": core.handle_birthdays,
+        "find": core.handle_find,
     }
 
     while True:
@@ -123,7 +125,7 @@ def main():
                 print("Hello! How can I help you?")
             case "help":
                 print(MSG_HELP)
-            case "record" | "phone" | "address" | "email" | "birthday" | "all" | "birthdays":
+            case "record" | "phone" | "address" | "email" | "birthday" | "all" | "birthdays" | "find":
                 print(cmd_funcs[cmd](args, book))
             case _:
                 print("ERROR: Unknown command. Try again.")

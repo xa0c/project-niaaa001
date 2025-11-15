@@ -330,6 +330,26 @@ class AddressBook(UserDict):
         if phone and record.find_phone(phone) is None:
             return None
         return record
+    
+    def find(self, search_value: str = None) -> list[Record] | None:
+        """Return Record record by name, phones, email, physical address.
+
+        Args:
+            search_value (str): Matching value to find.
+
+        Returns:
+            Record or None: Object if found. None otherwise.
+        """
+        records = []
+        for record in self.values():
+            if (
+                search_value in record.name.value.lower() or
+                (record.address and search_value in record.address.value.lower()) or
+                (record.email and search_value in record.email.value.lower()) or
+                any(search_value in phone.value for phone in record.phones)
+            ):
+                records.append(record)
+        return records
 
     def get_upcoming_birthdays(self, days: int) -> list[dict]:
         """Return upcoming birthdays list.

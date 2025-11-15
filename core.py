@@ -423,6 +423,53 @@ def handle_birthdays(args: list[str], book: AddressBook) -> str:
     return "\n".join(output_list)
 
 
+@input_error
+def handle_find(args: list[str], book: AddressBook) -> str:
+    """Handle find commands: search for records by name, phone, email or address.
+
+    Args:
+        args (list[str]): List with raw cmd arguments.
+        book (AddressBook): AddressBook object.
+
+    Returns:
+        str: Matching records formatted as tables.
+
+    Raises:
+        InvalidCmdArgsCountError: If command has invalid argument count.
+        RecordNotExists: If no Record matches the search string.
+    """
+    try:
+        search_value, *_ = args
+    except:
+        raise InvalidCmdArgsCountError
+
+    records = book.find(search_value)
+
+    if not records:
+        raise RecordNotExists
+
+    # Build output
+    output = ""
+    for record in records:
+        output += "/" + '═' * 30 + "\\\n"
+        output += "│" + f" Name: {record.name.value}".ljust(30) + "│\n"
+        if record.birthday is not None:
+            output += "│" + f" Birthday: {record.birthday}".ljust(30) + "│\n"
+        if record.address is not None:
+            output += "│" + f" Address: {record.address}".ljust(30) + "│\n"
+        if record.email is not None:
+            output += "│" + f" Email: {record.email}".ljust(30) + "│\n"
+        output += "├" + "─" * 30 + "┤\n"
+        output += "│" + "Phones".center(30) + "│\n"
+        output += "│" + "-" * 30 + "│\n"
+
+        for phone in record.phones:
+            output += "│ " + str(phone).ljust(29) + "│\n"
+        output += "└" + "─" * 30 + "┘\n"
+
+    return output
+
+
 def load_data(path: str) -> AddressBook:
     """Load AddressBook object from the Pickle-serialized data file.
 
