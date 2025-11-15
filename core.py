@@ -11,7 +11,7 @@ from contacts import (
     InvalidAddressFormatError,
     InvalidEmailFormatError,
 )
-
+from prettytable import PrettyTable
 
 class InvalidCmdArgsCountError(ValueError):
     """Custom exception for invalid cmd args count."""
@@ -154,8 +154,10 @@ def handle_phone(args: list[str], book: AddressBook) -> str:
 
     # Handle Get functionality
     if value is None and replace_value is None:
-        output = "\n".join(phone.value for phone in record.phones)
-        return output if output else f"No phones found for the `{name}` Record."
+        table = PrettyTable()
+        table.field_names = ["Phone Numbers"]
+        table.add_rows([[phone.value] for phone in record.phones])
+        return table
     # Handle Add functionality
     if value is not None and replace_value is None:
         record.add_phone(value)
@@ -368,23 +370,15 @@ def render_record_table(record: Record) -> str:
     Returns:
         str: Rendered Record "card".
     """
-    output = "/" + '═' * 30 + "\\\n"
-    output += "│" + f" Name: {record.name}".ljust(30) + "│\n"
-    if record.birthday is not None:
-        output += "│" + f" Birthday: {record.birthday}".ljust(30) + "│\n"
-    if record.address is not None:
-        output += "│" + f" Address: {record.address}".ljust(30) + "│\n"
-    if record.email is not None:
-        output += "│" + f" Email: {record.email}".ljust(30) + "│\n"
-    output += "├" + "─" * 30 + "┤\n"
-    output += "│" + "Phones".center(30) + "│\n"
-    output += "│" + "-" * 30 + "│\n"
-
-    for phone in record.phones:
-        output += "│ " + str(phone).ljust(29) + "│\n"
-    output += "└" + "─" * 30 + "┘\n"
-    return output
-
+    table = PrettyTable()
+    table.field_names = ["Name", "Birthday", "Address", "Email", "Phones"]
+    name_str = str(record.name)
+    birthday_str = str(record.birthday) if record.birthday else ""
+    address_str = str(record.address) if record.address else ""
+    email_str = str(record.email) if record.email else ""
+    phones_str = ", ".join(phone.value for phone in record.phones) if record.phones else ""
+    table.add_row([name_str, birthday_str, address_str, email_str, phones_str])
+    return table
 
 @input_error
 def handle_birthdays(args: list[str], book: AddressBook) -> str:
