@@ -18,31 +18,38 @@ def is_leap_year(year: int) -> bool:
     return year % 4 == 0 and year % 100 != 0 or year % 400 == 0
 
 
-class InvalidPhoneFormatError(ValueError):
+class InvalidPropertyFormatError(ValueError):
+    """Custom exception for invalid property format."""
+
+    def __init__(self, message="Invalid property format."):
+        super().__init__(message)
+
+
+class InvalidPhoneFormatError(InvalidPropertyFormatError):
     """Custom exception for invalid phone format."""
 
     def __init__(self, message="Invalid phone format: must be 10 ASCII digits starting with 0."):
         super().__init__(message)
 
 
-class InvalidDateFormatError(ValueError):
+class InvalidDateFormatError(InvalidPropertyFormatError):
     """Custom exception for invalid date format."""
 
     def __init__(self, message="Invalid date format: must be `DD.MM.YYYY`."):
         super().__init__(message)
 
 
-class InvalidNameFormatError(ValueError):
+class InvalidNameFormatError(InvalidPropertyFormatError):
     def __init__(self, message="Invalid name format: length must be <= 20."):
         super().__init__(message)
 
 
-class InvalidAddressFormatError(ValueError):
+class InvalidAddressFormatError(InvalidPropertyFormatError):
     def __init__(self, message="Invalid address format: length must be <= 300."):
         super().__init__(message)
 
 
-class InvalidEmailFormatError(ValueError):
+class InvalidEmailFormatError(InvalidPropertyFormatError):
     def __init__(self, message="Invalid email format: must match pattern and length <= 254."):
         super().__init__(message)
 
