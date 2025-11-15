@@ -90,7 +90,7 @@ def handle_record(args: list[str], book: AddressBook) -> str:
     except:
         raise InvalidCmdArgsCountError
 
-    record = book.find_record(name)
+    record = book.get_record(name)
     is_new_record = False
 
     # If Record wasn't found, raise error for all cases except "Create/Show" functionality
@@ -105,7 +105,7 @@ def handle_record(args: list[str], book: AddressBook) -> str:
     if value is None:
         if is_new_record:
             return f"New `{name}` Record was created."
-        return render_record_table(name, book)
+        return render_record_table(record)
     # Handle Delete functionality
     if value == "":
         book.delete_record(name)
@@ -146,7 +146,7 @@ def handle_phone(args: list[str], book: AddressBook) -> str:
     except:
         raise InvalidCmdArgsCountError
 
-    record = book.find_record(name)
+    record = book.get_record(name)
 
     # If Record wasn't found, raise error
     if record is None:
@@ -202,7 +202,7 @@ def handle_address(args: list[str], book: AddressBook) -> str:
     except:
         raise InvalidCmdArgsCountError
 
-    record = book.find_record(name)
+    record = book.get_record(name)
 
     # If Record wasn't found, raise error
     if record is None:
@@ -250,7 +250,7 @@ def handle_email(args: list[str], book: AddressBook) -> str:
     except:
         raise InvalidCmdArgsCountError
 
-    record = book.find_record(name)
+    record = book.get_record(name)
 
     # If Record wasn't found, raise error
     if record is None:
@@ -298,7 +298,7 @@ def handle_birthday(args: list[str], book: AddressBook) -> str:
     except:
         raise InvalidCmdArgsCountError
 
-    record = book.find_record(name)
+    record = book.get_record(name)
 
     # If Record wasn't found, raise error
     if record is None:
@@ -320,18 +320,18 @@ def handle_birthday(args: list[str], book: AddressBook) -> str:
 
 
 @input_error
-def render_record_table(args: dict[str, str], book: AddressBook) -> str:
-    """Render Record fields table.
+def handle_all(args: list[str], book: AddressBook) -> str:
+    """Handle all command.
 
-    Render single Record if name is provided. Otherwise render all.
+    Render single Record "card" if name is provided. Otherwise - all.
 
     Args:
-        args (dict[str, str]): Dict with raw cmd arguments.
+        args (list[str]): List with raw cmd arguments.
             Keys: name (optional).
         book (AddressBook): AddressBook object.
 
     Returns:
-        str: Rendered Record fields table.
+        str: Rendered Record "card".
 
     Raises:
         InvalidCmdArgsCountError: If command has invalid argument count.
@@ -340,39 +340,49 @@ def render_record_table(args: dict[str, str], book: AddressBook) -> str:
     try:
         name, *_ = args
     except:
-        print(args)
-        print("zzz")
         raise InvalidCmdArgsCountError
-
-    src = book
 
     # Render single Record if name was specified
     if name:
-        record = book.find_record(name)
+        record = book.get_record(name)
         # Check if specified Record exists
         if record is None:
             raise RecordNotExists
-        src = AddressBook()
-        src.add_record(record)
+        return render_record_table(record)
 
-    # Build output
+    # Render all Record "cards"
     output = ""
-    for name, record in src.items():
-        output += "/" + '═' * 30 + "\\\n"
-        output += "│" + f" Name: {name}".ljust(30) + "│\n"
-        if record.birthday is not None:
-            output += "│" + f" Birthday: {record.birthday}".ljust(30) + "│\n"
-        if record.address is not None:
-            output += "│" + f" Address: {record.address}".ljust(30) + "│\n"
-        if record.email is not None:
-            output += "│" + f" Email: {record.email}".ljust(30) + "│\n"
-        output += "├" + "─" * 30 + "┤\n"
-        output += "│" + "Phones".center(30) + "│\n"
-        output += "│" + "-" * 30 + "│\n"
+    for record in book.values():
+        output += render_record_table(record)
+    return output
 
-        for phone in record.phones:
-            output += "│ " + str(phone).ljust(29) + "│\n"
-        output += "└" + "─" * 30 + "┘\n"
+
+def render_record_table(record: Record) -> str:
+    """Render Record fields table.
+
+    Render specified Record "card".
+
+    Args:
+        record (Record): Record object.
+
+    Returns:
+        str: Rendered Record "card".
+    """
+    output = "/" + '═' * 30 + "\\\n"
+    output += "│" + f" Name: {record.name}".ljust(30) + "│\n"
+    if record.birthday is not None:
+        output += "│" + f" Birthday: {record.birthday}".ljust(30) + "│\n"
+    if record.address is not None:
+        output += "│" + f" Address: {record.address}".ljust(30) + "│\n"
+    if record.email is not None:
+        output += "│" + f" Email: {record.email}".ljust(30) + "│\n"
+    output += "├" + "─" * 30 + "┤\n"
+    output += "│" + "Phones".center(30) + "│\n"
+    output += "│" + "-" * 30 + "│\n"
+
+    for phone in record.phones:
+        output += "│ " + str(phone).ljust(29) + "│\n"
+    output += "└" + "─" * 30 + "┘\n"
     return output
 
 
@@ -452,22 +462,7 @@ def handle_find(args: list[str], book: AddressBook) -> str:
     # Render all matched Record "cards"
     output = ""
     for record in records:
-        output += "/" + '═' * 30 + "\\\n"
-        output += "│" + f" Name: {record.name.value}".ljust(30) + "│\n"
-        if record.birthday is not None:
-            output += "│" + f" Birthday: {record.birthday}".ljust(30) + "│\n"
-        if record.address is not None:
-            output += "│" + f" Address: {record.address}".ljust(30) + "│\n"
-        if record.email is not None:
-            output += "│" + f" Email: {record.email}".ljust(30) + "│\n"
-        output += "├" + "─" * 30 + "┤\n"
-        output += "│" + "Phones".center(30) + "│\n"
-        output += "│" + "-" * 30 + "│\n"
-
-        for phone in record.phones:
-            output += "│ " + str(phone).ljust(29) + "│\n"
-        output += "└" + "─" * 30 + "┘\n"
-
+        output += render_record_table(record)
     return output
 
 

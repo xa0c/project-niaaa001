@@ -96,7 +96,7 @@ def main():
         "address": core.handle_address,
         "email": core.handle_email,
         "birthday": core.handle_birthday,
-        "all": core.render_record_table,
+        "all": core.handle_all,
         "birthdays": core.handle_birthdays,
         "find": core.handle_find,
     }

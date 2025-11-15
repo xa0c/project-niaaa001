@@ -314,22 +314,16 @@ class AddressBook(UserDict):
         # Preserve position during dict key change
         self.data = {new_name if key == name else key: val for key, val in self.data.items()}
 
-    def find_record(self, name: str, phone: str = None) -> Record | None:
-        """Return Record record by name.
+    def get_record(self, name: str = None) -> Record | None:
+        """Return Record by name.
 
         Args:
-            name (str): Key of the Record to find.
-            phone (str): Optional match by phone string value.
+            name (str): Key of the Record to get.
 
         Returns:
             Record or None: Object if found. None otherwise.
         """
-        record = self.data.get(name)
-        if record is None:
-            return None
-        if phone and record.find_phone(phone) is None:
-            return None
-        return record
+        return self.data.get(name)
 
     def find(self, search_value: str = None) -> list[Record]:
         """Search Records by name, birthday, phones, email, address.
