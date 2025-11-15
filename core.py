@@ -412,20 +412,14 @@ def handle_birthdays(args: list[str], book: AddressBook) -> str:
         days = 7 if days is None else int(days)
     except ValueError as e:
         raise InvalidCmdArgTypeError from e
-
-    result = book.get_upcoming_birthdays(days)
-
+    
     # Assemble table
-    output_list = []
+    result = book.get_upcoming_birthdays(days)
+    table = PrettyTable()
+    table.field_names = ["User", "Congratulation date", "Days to birthday"]
     for row in result:
-        s = str(row["congratulation_date"])
-        s += f" (in {row["wait_days_count"]} "
-        s += "day): " if row["wait_days_count"] == 1 else "days): "
-        s += str(row["record"].name)
-        output_list.append(s)
-
-    return "\n".join(output_list)
-
+        table.add_row([row["record"].name, str(row["congratulation_date"]), row["wait_days_count"]])
+    return table
 
 @input_error
 def handle_find(args: list[str], book: AddressBook) -> str:
