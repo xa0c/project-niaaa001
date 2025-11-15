@@ -1,9 +1,13 @@
+import os
 import re
 from collections import UserDict
 from datetime import date, datetime
 
 BIRTHDAY_FORMAT = "%d.%m.%Y"
 EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+PHOTO_VALID_EXT = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
+PHOTO_FORBIDDEN_CHARS = set('*?<>|"')
+
 
 
 def is_leap_year(year: int) -> bool:
@@ -51,6 +55,10 @@ class InvalidAddressFormatError(InvalidPropertyFormatError):
 
 class InvalidEmailFormatError(InvalidPropertyFormatError):
     def __init__(self, message="Invalid email format: must match pattern and length <= 254."):
+        super().__init__(message)
+
+class InvalidPhotoFormatError(ValueError):
+    def __init__(self, message=f"Invalid photo filepath format: must have allowed extention ({', '.join(PHOTO_VALID_EXT)}) and not contain forbidden characters."):
         super().__init__(message)
 
 
@@ -184,6 +192,34 @@ class Email(Field):
         self.value = value
 
 
+class Photo(Field):
+    """Field class for storing Record photo filepath field."""
+
+
+    def __init__(self, value: str):
+        self.set_value(value)
+
+    def set_value(self, value: str):
+        """Setter with input validation.
+
+        Raises:
+            InvalidPhotoFormatError: If filepath is invalid or file doesn't exist.
+        """
+        value = value.strip()
+        _, ext = os.path.splitext(value.lower())
+        
+        if ext not in PHOTO_VALID_EXT or any(ch in value for ch in PHOTO_FORBIDDEN_CHARS):
+            raise InvalidPhotoFormatError(
+                f"Invalid photo filepath `{value}`: must have allowed extension "
+                f"({', '.join(PHOTO_VALID_EXT)}) and not contain forbidden characters ({''.join(PHOTO_FORBIDDEN_CHARS)})."
+            )
+
+        if os.path.isabs(value) and not os.path.exists(value):
+            raise InvalidPhotoFormatError(f"Photo file not found at absolute path `{value}`.")
+
+        self.value = os.path.normpath(value)
+
+
 class Record:
     """Record for contact info management.
 
@@ -197,6 +233,7 @@ class Record:
         self.birthday = None
         self.address = None
         self.email = None
+        self.photo = None
 
     def __str__(self):
         return f"Contact name: {self.name}, phones: {'; '.join(p.value for p in self.phones)}"
@@ -283,6 +320,14 @@ class Record:
             InvalidEmailFormatError: If email format is invalid.
         """
         self.email = Email(value)
+
+    def set_photo(self, value: str):
+        """Set photo for the record.
+
+        Args:
+            value (str): String value of the photo filepath to set.
+        """
+        self.photo = Photo(value)
 
 
 class AddressBook(UserDict):
