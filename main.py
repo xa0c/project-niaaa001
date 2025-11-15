@@ -13,31 +13,56 @@ DESCRIPTION:
     This script provides CLI for contact management.
 
 USAGE:
-    - add <person> <value>
-        Add phone number for the specified person. Create person if missing.
-    - change <person> <old_value> <new_value>
-        Replace specified phone number with new value for the specified person.
-    - phone <person>
-        Print all person's phone numbers.
+    - record <name>
+        Show Record's "card". Create Record if missing.
+    - record <record_name> <value>
+        Rename Record.
+    - record <record_name> ""
+        Delete Record.
+
+    - address <record_name>
+        Show Record's address.
+    - address <record_name> <value>
+        Set Record's address.
+    - address <record_name> ""
+        Unset Record's address.
+    - birthday <record_name>
+        Show Record's birthday.
+    - birthday <record_name> <value>
+        Set Record's birthday.
+    - birthday <record_name> ""
+        Unset Record's birthday.
+    - email <record_name>
+        Show Record's email.
+    - email <record_name> <value>
+        Set Record's email.
+    - email <record_name> ""
+        Unset Record's email.
+
+    - phone <record_name>
+        Show all phones of the Record.
+    - phone <record_name> <value>
+        Add new phone to the Record.
+    - phone <record_name> <value> <new_value>
+        Replace phone with new value.
+    - phone <record_name> <value> ""
+        Delete phone from the list.
+
     - all [ <person> ]
-        If person is specified, print person's fields table.
-        Otherwise prints fields table for everyone.
-    - add-birthday <person> <value>
-        Add birthday for the specified person. Create person if missing.
-    - show-birthday <person>
-        Print person's birthday.
+        If person is specified, show Record "card".
+        Otherwise show all "cards".
     - birthdays [ <days> ]
-        If days is specified, print list of congratulation dates for persons which birthdays are \
-        within specified period. Otherwise period defaults to 7 days.
+        If days is specified, show congratulation dates for persons which birthdays are within \
+        specified period. Otherwise period defaults to 7 days.
     - help
         Prints this message.
     - hello
         Prints "hello" message.
     - exit | close
-        Quits application.
+        Saves data into the file and quits application.
 
 NOTES:
-    Person name can contain spaces."""
+    Use double quotes if values contain spaces."""
 
 MSG_BAD_ARG_COUNT = "Wrong number of arguments. Type `help` to read about command usage."
 CMD_CFG = {
