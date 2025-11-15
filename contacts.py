@@ -1,6 +1,6 @@
-from collections import UserDict
-from datetime import datetime, date
 import re
+from collections import UserDict
+from datetime import date, datetime
 
 BIRTHDAY_FORMAT = "%d.%m.%Y"
 EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
@@ -33,7 +33,7 @@ class InvalidDateFormatError(ValueError):
 
 
 class InvalidNameFormatError(ValueError):
-    def __init__(self, message="Invalid name format: length must be <= 100."):
+    def __init__(self, message="Invalid name format: length must be <= 20."):
         super().__init__(message)
 
 
@@ -68,7 +68,7 @@ class Name(Field):
         self.set_value(value)
 
     def set_value(self, value: str):
-        if len(value) > 100:
+        if len(value) > 20:
             raise InvalidNameFormatError
         self.value = value
 
@@ -102,7 +102,7 @@ class Phone(Field):
         Raises:
             InvalidPhoneFormatError: If phone format is invalid.
         """
-        if len(value) != 10 or not (value.isascii() and value.isdigit()) or value[0] != '0':
+        if len(value) != 10 or value[0] != '0' or not (value.isascii() and value.isdigit()):
             raise InvalidPhoneFormatError
         self.value = value
 
@@ -131,21 +131,44 @@ class Birthday(Field):
 
 
 class Address(Field):
+    """Field class for storing Record address field."""
 
     def __init__(self, value: str):
+        """Same parameters as `Field.__init__`.
+
+        Raises:
+            InvalidAddressFormatError: If address format is invalid.
+        """
         self.set_value(value)
 
     def set_value(self, value: str):
+        """Setter with input format validation.
+
+        Raises:
+            InvalidAddressFormatError: If address format is invalid.
+        """
         if len(value) > 300:
             raise InvalidAddressFormatError
         self.value = value
 
+
 class Email(Field):
+    """Field class for storing Record email field."""
 
     def __init__(self, value: str):
+        """Same parameters as `Field.__init__`.
+
+        Raises:
+            InvalidEmailFormatError: If email format is invalid.
+        """
         self.set_value(value)
 
     def set_value(self, value: str):
+        """Setter with input format validation.
+
+        Raises:
+            InvalidEmailFormatError: If email format is invalid.
+        """
         if len(value) > 254 or not EMAIL_PATTERN.match(value):
             raise InvalidEmailFormatError
         self.value = value
@@ -218,16 +241,38 @@ class Record:
         except (ValueError, IndexError):
             return None
 
-    def add_birthday(self, value: str):
+    def set_birthday(self, value: str):
         """Set birthday for the record.
 
         Args:
-            value (str): String value of the birthday to add.
+            value (str): String value of the birthday to set.
 
         Raises:
             InvalidDateFormatError: If birthday format is invalid.
         """
         self.birthday = Birthday(value)
+
+    def set_address(self, value: str):
+        """Set address for the record.
+
+        Args:
+            value (str): String value of the address to set.
+
+        Raises:
+            InvalidAddressFormatError: If address format is invalid.
+        """
+        self.address = Address(value)
+
+    def set_email(self, value: str):
+        """Set email for the record.
+
+        Args:
+            value (str): String value of the email to set.
+
+        Raises:
+            InvalidEmailFormatError: If email format is invalid.
+        """
+        self.email = Email(value)
 
 
 class AddressBook(UserDict):
@@ -241,18 +286,32 @@ class AddressBook(UserDict):
         """
         self.data[record.name.value] = record
 
-    def delete(self, name: str):
+    def delete_record(self, name: str):
         """Delete Record from the dict.
 
         Args:
-            name (str): Key of the Record to remove.
+            name (str): Key of the Record to delete.
 
         Raises:
             KeyError: If key not found during referencing.
         """
         del self.data[name]
 
-    def find(self, name: str, phone: str = None) -> Record | None:
+    def rename_record(self, name: str, new_name: str):
+        """Rename Record and update name field.
+
+        Args:
+            name (str): Existing key of the Record to rename.
+            new_name (str): New name.
+
+        Raises:
+            KeyError: If key not found during referencing.
+        """
+        self.data[name].name.set_value(new_name)
+        # Preserve position during dict key change
+        self.data = {new_name if key == name else key: val for key, val in self.data.items()}
+
+    def find_record(self, name: str, phone: str = None) -> Record | None:
         """Return Record record by name.
 
         Args:
