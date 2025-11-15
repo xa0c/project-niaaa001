@@ -1,5 +1,9 @@
 import csv
-import readline
+try:
+    import readline
+except ImportError:
+    pass
+
 import core
 from contacts import AddressBook
 
@@ -35,17 +39,29 @@ NOTES:
     Person name can contain spaces."""
 
 MSG_BAD_ARG_COUNT = "Wrong number of arguments. Type `help` to read about command usage."
+CMD_CFG = {
+    "exit": (0, 0),
+    "close": (0, 0),
+    "hello": (0, 0),
+    "help": (0, 0),
+    "record": (1, 2),
+    "phone": (1, 3),
+    "address": (1, 2),
+    "email": (1, 2),
+    "birthday": (1, 2),
+    "all": (0, 1),
+    "birthdays": (0, 0),
+}
 
 
-def parse_input(user_input: str) -> tuple[str, dict[str, str]]:
+def parse_input(user_input: str) -> tuple[str, list[str]]:
     """Parse string into a tuple of command name and its arguments.
 
     Args:
         user_input (str): Input string.
 
     Returns:
-        tuple[str, dict[str, str]]: Tuple of command name and a
-            dictionary of it's arguments.
+        tuple[str, list[str]: Tuple of command name and arguments list.
 
     Raises:
         ValueError: If user input has wrong number of arguments.
@@ -53,34 +69,17 @@ def parse_input(user_input: str) -> tuple[str, dict[str, str]]:
     if not user_input:
         return "", {}
 
+    args = [None] * 3 # With `3` being the max number of args across all commands
     reader = csv.reader([user_input.strip()], delimiter=" ")
-    cmd, *args = next(reader)
+    cmd, *input_args = next(reader)
     cmd = cmd.lower()
-    match cmd:
-        case "add" | "add-birthday":
-            if len(args) != 2:
-                raise ValueError(MSG_BAD_ARG_COUNT)
-            args = {"name": args[0], "value": args[1]}
-        case "change":
-            if len(args) != 3:
-                raise ValueError(MSG_BAD_ARG_COUNT)
-            args = {"name": args[0], "old_value": args[1], "new_value": args[2]}
-        case "phone" | "show-birthday":
-            if len(args) != 1:
-                raise ValueError(MSG_BAD_ARG_COUNT)
-            args = {"name": args[0]}
-        case "all":
-            match len(args):
-                case 0:
-                    args = {"name": None}
-                case 1:
-                    args = {"name": args[0]}
-                case _:
-                    raise ValueError(MSG_BAD_ARG_COUNT)
-        case "birthdays":
-            if len(args) != 0:
-                raise ValueError(MSG_BAD_ARG_COUNT)
-            args = {}
+    if cmd not in CMD_CFG:
+        raise ValueError
+
+    if not CMD_CFG[cmd][0] <= len(input_args) <= CMD_CFG[cmd][1]:
+        raise ValueError(MSG_BAD_ARG_COUNT)
+
+    args[:len(input_args)] = input_args
     return cmd, args
 
 
@@ -90,12 +89,12 @@ def main():
 
     # Store functions for easier command handling
     cmd_funcs = {
-        "add": core.add_contact,
-        "change": core.change_contact,
-        "phone": core.show_phone,
+        "record": core.handle_record,
+        "phone": core.handle_phone,
+        "address": core.handle_address,
+        "email": core.handle_email,
+        "birthday": core.handle_birthday,
         "all": core.render_record_table,
-        "add-birthday": core.add_birthday,
-        "show-birthday": core.show_birthday,
         "birthdays": core.birthdays,
     }
 
@@ -123,10 +122,7 @@ def main():
                 print("Hello! How can I help you?")
             case "help":
                 print(MSG_HELP)
-            case (
-                "add" | "change" | "phone" | "all" | "add-birthday" | "show-birthday" |
-                "birthdays"
-            ):
+            case "record" | "phone" | "address" | "email" | "birthday" | "all" | "birthdays":
                 print(cmd_funcs[cmd](args, book))
             case _:
                 print("ERROR: Unknown command. Try again.")
