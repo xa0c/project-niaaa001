@@ -28,7 +28,7 @@ USAGE:
         Print person's birthday.
     - birthdays [ <days> ]
         If days is specified, print list of congratulation dates for persons which birthdays are \
-        within specified period. Otherwise defaults to 7 days period.
+        within specified period. Otherwise period defaults to 7 days.
     - help
         Prints this message.
     - hello
@@ -70,7 +70,7 @@ def parse_input(user_input: str) -> tuple[str, list[str]]:
     if not user_input:
         return "", {}
 
-    args = [None] * 3 # With `3` being the max number of args across all commands
+    args = [None] * 3  # With `3` being the max number of args across all commands
     reader = csv.reader([user_input.strip()], delimiter=" ")
     cmd, *input_args = next(reader)
     cmd = cmd.lower()
@@ -96,7 +96,7 @@ def main():
         "email": core.handle_email,
         "birthday": core.handle_birthday,
         "all": core.render_record_table,
-        "birthdays": core.birthdays,
+        "birthdays": core.handle_birthdays,
     }
 
     while True:

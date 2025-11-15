@@ -20,6 +20,13 @@ class InvalidCmdArgsCountError(ValueError):
         super().__init__(message)
 
 
+class InvalidCmdArgTypeError(ValueError):
+    """Custom exception for invalid cmd argument type."""
+
+    def __init__(self, message="Invalid cmd argument data type."):
+        super().__init__(message)
+
+
 class RecordNotExists(ValueError):
     """Custom exception if specified Record doesn't exist."""
 
@@ -50,7 +57,7 @@ def input_error(func: Callable) -> Callable:
         except (
             InvalidCmdArgsCountError, RecordNotExists, FieldNotExists, InvalidPhoneFormatError,
             InvalidDateFormatError, InvalidNameFormatError, InvalidAddressFormatError,
-            InvalidEmailFormatError
+            InvalidEmailFormatError, InvalidCmdArgTypeError
         ) as e:
             return f"ERROR: {e.args[0]} Try again."
     return inner
@@ -370,23 +377,41 @@ def render_record_table(args: dict[str, str], book: AddressBook) -> str:
 
 
 @input_error
-def birthdays(args: list[str], book: AddressBook) -> str:
-    """Output table of records with upcoming birthdays.
+def handle_birthdays(args: list[str], book: AddressBook) -> str:
+    """Handle birthdays command.
+
+    If args is empty:
+        Output table of records with upcoming birthdays, which occur \
+        within default range: 7 days.
+    If args has 1 item:
+        Output table of records with upcoming birthdays, which occur \
+        within specified range in days.
 
     Args:
+        args (list[str]): List with raw cmd arguments.
         book (AddressBook): AddressBook object.
 
     Returns:
-        str: Multiline string with Record names and congrat dates.
+        str: Operation result message or upcoming birthdays table.
+
+    Raises:
+        InvalidCmdArgsCountError: If command has invalid argument count.
+        InvalidCmdArgTypeError: If input argument has wrong type.
     """
     try:
         days, *_ = args
-        days = 7 if days is None else int(days)
     except:
         raise InvalidCmdArgsCountError
 
+    # Validate input and apply default if needed
+    try:
+        days = 7 if days is None else int(days)
+    except ValueError as e:
+        raise InvalidCmdArgTypeError from e
+
     result = book.get_upcoming_birthdays(days)
 
+    # Assemble table
     output_list = []
     for row in result:
         s = str(row["congratulation_date"])
@@ -394,6 +419,7 @@ def birthdays(args: list[str], book: AddressBook) -> str:
         s += "day): " if row["wait_days_count"] == 1 else "days): "
         s += str(row["record"].name)
         output_list.append(s)
+
     return "\n".join(output_list)
 
 
