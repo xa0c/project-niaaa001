@@ -118,6 +118,9 @@ class Birthday(Field):
         """
         self.set_value(value)
 
+    def __str__(self):
+        return self.value.strftime(BIRTHDAY_FORMAT)
+
     def set_value(self, value: str):
         """Setter with input format validation.
 
@@ -328,18 +331,22 @@ class AddressBook(UserDict):
             return None
         return record
 
-    def get_upcoming_birthdays(self, days: int) -> list[dict[str, str]]:
-        """Create upcoming birthdays list.
+    def get_upcoming_birthdays(self, days: int) -> list[dict]:
+        """Return upcoming birthdays list.
 
         Args:
             days (int): Amount of days in future to check birthdays.
 
         Returns:
-            list[dict[str, str]]: Upcoming birthdays list.
+            list[dict]: Upcoming birthdays list with dict structure:
+                {
+                    "record": Record,
+                    "congratulation_date": date,
+                    "wait_days_count": int,
+                }
         """
         result = []
         today = date.today()
-        today_ordinal = today.toordinal()
         this_is_leap_year = is_leap_year(today.year)
         next_is_leap_year = is_leap_year(today.year + 1)
 
@@ -349,8 +356,6 @@ class AddressBook(UserDict):
                 continue
 
             bd = rec.birthday.value
-
-            # Save booling for Feb 29th birthdays handling in this/next year
             is_feb29 = bd.month == 2 and bd.day == 29
 
             # Determine congratulation date in this year
@@ -359,26 +364,23 @@ class AddressBook(UserDict):
             else:
                 congrats_date = bd.replace(year=today.year)
 
-            # Determine congratulation date in the next year
-            if today > congrats_date:
+            # If birthday this year already passed, use next year
+            if congrats_date < today:
                 if is_feb29 and not next_is_leap_year:
-                    congrats_date = bd.replace(year=today.year+1, month=3, day=1)
+                    congrats_date = bd.replace(year=today.year + 1, month=3, day=1)
                 else:
-                    congrats_date = bd.replace(year=today.year+1)
+                    congrats_date = bd.replace(year=today.year + 1)
 
-            # Check if birthays happens within next `days`
-            congrats_ordinal = congrats_date.toordinal()
-            if today_ordinal > congrats_ordinal - days - 1:
-                # Check if congratulation date falls on weekend and move it to Monday
-                match congrats_date.weekday():
-                    case 5:
-                        congrats_ordinal += 2
-                    case 6:
-                        congrats_ordinal += 1
+            # Count remaining days
+            wait_days_count = (congrats_date - today).days
 
-                # Create and save Date object from ordinal value
-                congrats_date = date.fromordinal(congrats_ordinal).strftime(BIRTHDAY_FORMAT)
-                result.append({"name": rec.name.value, "congratulation_date": congrats_date})
+            # Include only those within next `days`
+            if 0 <= wait_days_count <= days:
+                result.append({
+                    "record": rec,
+                    "congratulation_date": congrats_date,
+                    "wait_days_count": wait_days_count,
+                })
 
-        # Perform additional sort by date
+        # Sort results by congratulation_date
         return sorted(result, key=lambda d: d["congratulation_date"])
