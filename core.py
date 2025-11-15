@@ -425,18 +425,19 @@ def handle_birthdays(args: list[str], book: AddressBook) -> str:
 
 @input_error
 def handle_find(args: list[str], book: AddressBook) -> str:
-    """Handle find commands: search for records by name, phone, email or address.
+    """Handle find command.
+
+    Search Records by all supported fields.
 
     Args:
         args (list[str]): List with raw cmd arguments.
         book (AddressBook): AddressBook object.
 
     Returns:
-        str: Matching records formatted as tables.
+        str: Operation result message or matched Record "cards".
 
     Raises:
         InvalidCmdArgsCountError: If command has invalid argument count.
-        RecordNotExists: If no Record matches the search string.
     """
     try:
         search_value, *_ = args
@@ -446,9 +447,9 @@ def handle_find(args: list[str], book: AddressBook) -> str:
     records = book.find(search_value)
 
     if not records:
-        raise RecordNotExists
+        return f"No Record matches for the `{search_value}` keyword."
 
-    # Build output
+    # Render all matched Record "cards"
     output = ""
     for record in records:
         output += "/" + '═' * 30 + "\\\n"
