@@ -96,14 +96,17 @@ CMD_CFG = {
     "close": (0, 0),
     "hello": (0, 0),
     "help": (0, 0),
-    "record": (1, 2),
+    "new-record": (1, 1),
+    "new-note": (1, 1),
+    "records": (0, 2),
+    "notes": (0, 2),
     "phone": (1, 3),
     "address": (1, 2),
     "email": (1, 2),
     "birthday": (1, 2),
-    "all": (0, 1),
     "birthdays": (0, 1),
-    "find": (1, 1),
+    "find-records": (1, 1),
+    "find-notes": (1, 1),
 }
 
 
@@ -127,7 +130,7 @@ def parse_input(user_input: str) -> tuple[str, list[str]]:
     cmd, *input_args = next(reader)
     cmd = cmd.lower()
     if cmd not in CMD_CFG:
-        raise ValueError
+        raise ValueError("Unknown command.")
 
     if not CMD_CFG[cmd][0] <= len(input_args) <= CMD_CFG[cmd][1]:
         raise ValueError(MSG_BAD_ARG_COUNT)
@@ -142,14 +145,17 @@ def main():
 
     # Store functions for easier command handling
     cmd_funcs = {
-        "record": core.handle_record,
+        "new-record": core.handle_new_record,
+        # "new-note": core.handle_new_note,
+        "records": core.handle_records,
+        # "notes": core.handle_notes,
         "phone": core.handle_phone,
-        "address": core.handle_address,
-        "email": core.handle_email,
-        "birthday": core.handle_birthday,
-        "all": core.handle_all,
+        "address": core.handle_record_prop,
+        "email": core.handle_record_prop,
+        "birthday": core.handle_record_prop,
         "birthdays": core.handle_birthdays,
-        "find": core.handle_find,
+        "find-records": core.handle_find_records,
+        #"find-notes": core.handle_find_notes,
     }
 
     while True:
@@ -169,15 +175,19 @@ def main():
         # Handle commands
         match cmd:
             case "exit" | "close":
-                core.save_data(book, FILEPATH)
+                print(core.save_data(book, FILEPATH))
                 print("Exiting program. Good bye!")
                 break
             case "hello":
                 print("Hello! How can I help you?")
             case "help":
                 print(MSG_HELP)
-            case "record" | "phone" | "address" | "email" | "birthday" | "all" | "birthdays" | "find":
+            case "new-record" | "records" | "birthdays" | "find-records" | "phone":
                 print(cmd_funcs[cmd](args, book))
+                core.save_data(book, FILEPATH)
+            case "address" | "email" | "birthday":
+                print(cmd_funcs[cmd](cmd, args, book))
+                core.save_data(book, FILEPATH)
             case _:
                 print("ERROR: Unknown command. Try again.")
 

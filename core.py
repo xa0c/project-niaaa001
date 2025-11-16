@@ -2,15 +2,8 @@ import functools
 import pickle
 from collections.abc import Callable
 
-from contacts import (
-    AddressBook,
-    Record,
-    InvalidPhoneFormatError,
-    InvalidDateFormatError,
-    InvalidNameFormatError,
-    InvalidAddressFormatError,
-    InvalidEmailFormatError,
-)
+from contacts import AddressBook, Record
+from contacts import InvalidPropertyFormatError
 from prettytable import PrettyTable
 
 class InvalidCmdArgsCountError(ValueError):
@@ -27,18 +20,43 @@ class InvalidCmdArgTypeError(ValueError):
         super().__init__(message)
 
 
-class RecordNotExists(ValueError):
+class RecordExistsError(ValueError):
+    """Custom exception if specified Record exists."""
+
+    def __init__(self, message="Specified Record already exists."):
+        super().__init__(message)
+
+
+class RecordNotExistsError(ValueError):
     """Custom exception if specified Record doesn't exist."""
 
     def __init__(self, message="Specified Record doesn't exist."):
         super().__init__(message)
 
 
-class FieldNotExists(ValueError):
+class FieldNotExistsError(ValueError):
     """Custom exception if specified Field doesn't exist."""
 
     def __init__(self, message="Specified Field doesn't exist."):
         super().__init__(message)
+
+
+def file_error(func: Callable) -> Callable:
+    """Decorator for file error handling.
+
+    Args:
+        func (Callable): Function to wrap.
+
+    Returns:
+        Callable: Wrapped function with same signature.
+    """
+    @functools.wraps(func)
+    def inner(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except (FileNotFoundError, OSError) as e:
+            return f"ERROR: {e.args[0]} Try again."
+    return inner
 
 
 def input_error(func: Callable) -> Callable:
@@ -55,20 +73,54 @@ def input_error(func: Callable) -> Callable:
         try:
             return func(*args, **kwargs)
         except (
-            InvalidCmdArgsCountError, RecordNotExists, FieldNotExists, InvalidPhoneFormatError,
-            InvalidDateFormatError, InvalidNameFormatError, InvalidAddressFormatError,
-            InvalidEmailFormatError, InvalidCmdArgTypeError
+            InvalidCmdArgsCountError, RecordExistsError, RecordNotExistsError, FieldNotExistsError,
+            InvalidPropertyFormatError, InvalidCmdArgTypeError
         ) as e:
             return f"ERROR: {e.args[0]} Try again."
     return inner
 
 
 @input_error
-def handle_record(args: list[str], book: AddressBook) -> str:
-    """Handle record commands: create/show, rename, delete.
+def handle_new_record(args: list[str], book: AddressBook) -> str:
+    """Handle new record command.
 
+    Create new Record.
+
+    Args:
+        args (list[str]): List with raw cmd arguments.
+        book (AddressBook): AddressBook object.
+
+    Returns:
+        str: Operation result message.
+
+    Raises:
+        InvalidCmdArgsCountError: If command has invalid argument count.
+        InvalidPropertyFormatError: If name format is invalid.
+    """
+    try:
+        name, value, *_ = args
+    except:
+        raise InvalidCmdArgsCountError
+
+    record = book.get_record(name)
+
+    # Don't allow to overwrite existing Record
+    if record is not None:
+        raise RecordExistsError
+
+    record = Record(name)
+    book.add_record(record)
+    return f"New `{name}` Record was created."
+
+
+@input_error
+def handle_records(args: list[str], book: AddressBook) -> str:
+    """Handle record commands: show, rename, delete.
+
+    If args is empty:
+        Show "cards" for all Records.
     If args has 1 item:
-        Show specified Record. Create new Record if missing.
+        Show "card" for specified Record.
     If args contains 2 items:
         Rename specified Record with the new value.
         If value is empty string, then delete specified Record.
@@ -82,34 +134,34 @@ def handle_record(args: list[str], book: AddressBook) -> str:
 
     Raises:
         InvalidCmdArgsCountError: If command has invalid argument count.
-        RecordNotExists: If specified Record doesn't exist.
-        InvalidNameFormatError: If new name format is invalid.
+        RecordNotExistsError: If specified Record doesn't exist.
+        InvalidPropertyFormatError: If new name format is invalid.
     """
     try:
         name, value, *_ = args
     except:
         raise InvalidCmdArgsCountError
 
+    # Handle ShowAll functionality
+    if name is None:
+        output = ""
+        for record in book.values():
+            output += render_record_table(record)
+        return output if output else "No Records."
+
     record = book.get_record(name)
-    is_new_record = False
 
-    # If Record wasn't found, raise error for all cases except "Create/Show" functionality
+    # If Record wasn't found, raise error for all cases except "ShowAll" functionality
     if record is None:
-        if value is not None:
-            raise RecordNotExists
-        record = Record(name)
-        book.add_record(record)
-        is_new_record = True
+        raise RecordNotExistsError
 
-    # Handle Create/Show functionality
+    # Handle Show functionality
     if value is None:
-        if is_new_record:
-            return f"New `{name}` Record was created."
         return render_record_table(record)
     # Handle Delete functionality
     if value == "":
         book.delete_record(name)
-        return f"Deleted `{name} Record."
+        return f"Deleted `{name}` Record."
     # Handle Rename functionality
     if value is not None:
         book.rename_record(name, value)
@@ -137,9 +189,9 @@ def handle_phone(args: list[str], book: AddressBook) -> str:
 
     Raises:
         InvalidCmdArgsCountError: If command has invalid argument count.
-        RecordNotExists: If specified Record doesn't exist.
-        FieldNotExists: If specified phone doesn't exist.
-        InvalidPhoneFormatError: If new phone number format is invalid.
+        RecordNotExistsError: If specified Record doesn't exist.
+        FieldNotExistsError: If specified phone doesn't exist.
+        InvalidPropertyFormatError: If new phone number format is invalid.
     """
     try:
         name, value, replace_value, *_ = args
@@ -150,7 +202,7 @@ def handle_phone(args: list[str], book: AddressBook) -> str:
 
     # If Record wasn't found, raise error
     if record is None:
-        raise RecordNotExists
+        raise RecordNotExistsError
 
     # Handle Get functionality
     if value is None and replace_value is None:
@@ -167,7 +219,7 @@ def handle_phone(args: list[str], book: AddressBook) -> str:
         # Check if specified phone field exists
         phone = record.find_phone(value)
         if phone is None:
-            raise FieldNotExists
+            raise FieldNotExistsError
         # Handle Delete functionality
         if replace_value == "":
             record.remove_phone(value)
@@ -178,26 +230,26 @@ def handle_phone(args: list[str], book: AddressBook) -> str:
 
 
 @input_error
-def handle_address(args: list[str], book: AddressBook) -> str:
-    """Handle address commands: show, set, unset.
+def handle_record_prop(prop: str, args: list[str], book: AddressBook) -> str:
+    """Handle Record property commands: show, set, unset.
 
     If args has 1 item:
-        Show address of the specified Record.
+        Show property value of the specified Record.
     If args has 2 items:
-        Set address of the specified Record.
-        If new value is empty string, then unset address field.
+        Set property of the specified Record.
+        If new value is empty string, then unset property field.
 
     Args:
         args (list[str]): List with raw cmd arguments.
         book (AddressBook): AddressBook object.
 
     Returns:
-        str: Operation result message or address value.
+        str: Operation result message or property textual representation.
 
     Raises:
         InvalidCmdArgsCountError: If command has invalid argument count.
-        RecordNotExists: If specified Record doesn't exist.
-        InvalidAddressFormatError: If address format is invalid.
+        RecordNotExistsError: If specified Record doesn't exist.
+        InvalidPropertyFormatError: If property format is invalid.
     """
     try:
         name, value, *_ = args
@@ -208,161 +260,23 @@ def handle_address(args: list[str], book: AddressBook) -> str:
 
     # If Record wasn't found, raise error
     if record is None:
-        raise RecordNotExists
+        raise RecordNotExistsError
 
     # Handle Get functionality
     if value is None:
-        if record.address is None:
-            return f"No address set for the `{name}` Record."
-        return record.address.value
+        prop_val = getattr(record, prop)
+        if prop_val is None:
+            return f"No {prop} set for the `{name}` Record."
+        return str(prop_val)
     # Handle Unset functionality
     if value == "":
-        record.address = None
-        return f"Unset address of the `{name}` Record."
+        setattr(record, prop, None)
+        return f"Unset {prop} of the `{name}` Record."
     # Handle Set functionality
     if value is not None:
-        record.set_address(value)
-        return f"Set address to `{value}` for the `{name}` Record."
-
-
-@input_error
-def handle_email(args: list[str], book: AddressBook) -> str:
-    """Handle email commands: show, set, unset.
-
-    If args has 1 item:
-        Show email of the specified Record.
-    If args has 2 items:
-        Set email of the specified Record.
-        If new value is empty string, then unset email field.
-
-    Args:
-        args (list[str]): List with raw cmd arguments.
-        book (AddressBook): AddressBook object.
-
-    Returns:
-        str: Operation result message or email value.
-
-    Raises:
-        InvalidCmdArgsCountError: If command has invalid argument count.
-        RecordNotExists: If specified Record doesn't exist.
-        InvalidEmailFormatError: If email format is invalid.
-    """
-    try:
-        name, value, *_ = args
-    except:
-        raise InvalidCmdArgsCountError
-
-    record = book.get_record(name)
-
-    # If Record wasn't found, raise error
-    if record is None:
-        raise RecordNotExists
-
-    # Handle Get functionality
-    if value is None:
-        if record.email is None:
-            return f"No email set for the `{name}` Record."
-        return record.email.value
-    # Handle Unset functionality
-    if value == "":
-        record.email = None
-        return f"Unset email of the `{name}` Record."
-    # Handle Set functionality
-    if value is not None:
-        record.set_email(value)
-        return f"Set email to `{value}` for the `{name}` Record."
-
-
-@input_error
-def handle_birthday(args: list[str], book: AddressBook) -> str:
-    """Handle birthday commands: show, set, unset.
-
-    If args has 1 item:
-        Show birthday of the specified Record.
-    If args has 2 items:
-        Set birthday of the specified Record.
-        If new value is empty string, then unset birthday field.
-
-    Args:
-        args (list[str]): List with raw cmd arguments.
-        book (AddressBook): AddressBook object.
-
-    Returns:
-        str: Operation result message or birthday textual representation.
-
-    Raises:
-        InvalidCmdArgsCountError: If command has invalid argument count.
-        RecordNotExists: If specified Record doesn't exist.
-        InvalidDateFormatError: If date format is invalid.
-    """
-    try:
-        name, value, *_ = args
-    except:
-        raise InvalidCmdArgsCountError
-
-    record = book.get_record(name)
-
-    # If Record wasn't found, raise error
-    if record is None:
-        raise RecordNotExists
-
-    # Handle Get functionality
-    if value is None:
-        if record.birthday is None:
-            return f"No birthday set for the `{name}` Record."
-        return str(record.birthday)
-    # Handle Unset functionality
-    if value == "":
-        record.birthday = None
-        return f"Unset birthday of the `{name}` Record."
-    # Handle Set functionality
-    if value is not None:
-        record.set_birthday(value)
-        return f"Set birthday to `{value}` for the `{name}` Record."
-
-
-@input_error
-def handle_all(args: list[str], book: AddressBook) -> str:
-    """Handle all command.
-
-    Render single Record "card" if name is provided. Otherwise - all.
-
-    Args:
-        args (list[str]): List with raw cmd arguments.
-            Keys: name (optional).
-        book (AddressBook): AddressBook object.
-
-    Returns:
-        str: Rendered Record "card".
-
-    Raises:
-        InvalidCmdArgsCountError: If command has invalid argument count.
-        RecordNotExists: If specified Record doesn't exist.
-    """
-    try:
-        name, *_ = args
-    except:
-        raise InvalidCmdArgsCountError
-
-    # Render single Record if name was specified
-    if name:
-        record = book.get_record(name)
-        # Check if specified Record exists
-        if record is None:
-            raise RecordNotExists
-        return render_record_table(record)
-
-    # Render all Records in one table
-    table = PrettyTable()
-    table.field_names = ["Name", "Birthday", "Address", "Email", "Phones"]
-    for record in book.values():
-        name_str = str(record.name)
-        birthday_str = str(record.birthday) if record.birthday else ""
-        address_str = str(record.address) if record.address else ""
-        email_str = str(record.email) if record.email else ""
-        phones_str = ", ".join(phone.value for phone in record.phones) if record.phones else ""
-        table.add_row([name_str, birthday_str, address_str, email_str, phones_str])
-    return table
+        set_prop_method = getattr(record, "set_" + prop)
+        set_prop_method(value)
+        return f"Set {prop} to `{value}` for the `{name}` Record."
 
 
 def render_record_table(record: Record) -> str:
@@ -429,7 +343,7 @@ def handle_birthdays(args: list[str], book: AddressBook) -> str:
 
 
 @input_error
-def handle_find(args: list[str], book: AddressBook) -> str:
+def handle_find_records(args: list[str], book: AddressBook) -> str:
     """Handle find command.
 
     Search Records by all supported fields.
@@ -467,6 +381,7 @@ def handle_find(args: list[str], book: AddressBook) -> str:
     return table
 
 
+@file_error
 def load_data(path: str) -> AddressBook:
     """Load AddressBook object from the Pickle-serialized data file.
 
@@ -479,28 +394,33 @@ def load_data(path: str) -> AddressBook:
     try:
         with open(path, "rb") as fh:
             return pickle.load(fh)
-    except FileNotFoundError:
-        print(f"INFO: File `{path}` wasn't found. Starting with an empty AdressBook.")
-    except OSError:
-        print(
+    except FileNotFoundError as e:
+        raise FileNotFoundError(
+            f"INFO: File `{path}` wasn't found. Starting with an empty AdressBook."
+        ) from e
+    except OSError as e:
+        raise OSError(
             f"ERROR: There was a problem reading `{path}` file. "
             "Starting with an empty AddressBook.\n"
             "Be careful, since your existing AddressBook may be overwritten."
-        )
+        ) from e
     return AddressBook()
 
 
-def save_data(book: AddressBook, path: str):
+@file_error
+def save_data(book: AddressBook, path: str) -> str:
     """Save AddressBook object to the Pickle-serialized data file.
 
     Args:
         book (AddressBook): Source object.
         path (str): Path to the data file.
+
+    Returns:
+        str: Operation result message.
     """
     try:
         with open(path, "wb") as fh:
             pickle.dump(book, fh)
-    except OSError:
-        print(f"ERROR: Failed to save AddressBook in `{path}` file.")
-    else:
-        print(f"AddressBook was saved in `{path}` file.")
+    except OSError as e:
+        raise OSError(f"ERROR: Failed to save AddressBook in `{path}` file.") from e
+    return f"AddressBook was saved in `{path}` file."
