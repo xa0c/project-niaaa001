@@ -24,7 +24,7 @@ USAGE:
     - records <name> ""    : Delete Record.
 
   ##### Record property actions:
-    Supported properties: address, birthday, email.
+    Supported properties: address, birthday, email, photo.
     - <property> <rec_name>       : Show Record's property.
     - <property> <rec_name> <val> : Set Record's property.
     - <property> <rec_name> ""    : Unset Record's property.
@@ -50,8 +50,8 @@ USAGE:
     - <list> <note_id> <val> ""        : Delete item from the list.
 
   ##### Other actions:
-    - find-records <val> : Search inside Records by keyword.
-    - find-notes <val>   : Search inside Notes by keyword.
+    - find-records <val> : Search inside Record fields by keyword.
+    - find-notes <val>   : Search inside Notes fields by keyword.
     - birthdays [ <days> ] : Show congratulation dates for persons which birthdays are within specified period (7 days by default).
     - help : Prints this message.
     - hello : Prints "hello" message.
@@ -74,6 +74,7 @@ CMD_CFG = {
     "address": (1, 2),
     "email": (1, 2),
     "birthday": (1, 2),
+    "photo": (1, 2),
     "birthdays": (0, 1),
     "find-records": (1, 1),
     "find-notes": (1, 1),
@@ -123,6 +124,7 @@ def main():
         "address": core.handle_record_prop,
         "email": core.handle_record_prop,
         "birthday": core.handle_record_prop,
+        "photo": core.handle_record_prop,
         "birthdays": core.handle_birthdays,
         "find-records": core.handle_find_records,
         #"find-notes": core.handle_find_notes,
@@ -155,7 +157,7 @@ def main():
             case "new-record" | "records" | "birthdays" | "find-records" | "phone":
                 print(cmd_funcs[cmd](args, book))
                 core.save_data(book, FILEPATH)
-            case "address" | "email" | "birthday":
+            case "address" | "email" | "birthday" | "photo":
                 print(cmd_funcs[cmd](cmd, args, book))
                 core.save_data(book, FILEPATH)
             case _:
