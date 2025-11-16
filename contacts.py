@@ -1,25 +1,16 @@
-import os
+import io
 import re
 from collections import UserDict
 from datetime import date, datetime
 
+from PIL import Image
+from ascii_magic import AsciiArt
+
+import utils
+
+
 BIRTHDAY_FORMAT = "%d.%m.%Y"
 EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-PHOTO_VALID_EXT = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
-PHOTO_FORBIDDEN_CHARS = set('*?<>|"')
-
-
-
-def is_leap_year(year: int) -> bool:
-    """Check if provided year is a leap year.
-
-    Args:
-        year (int): Year to check.
-
-    Returns:
-        bool: True if a leap year. False otherwise.
-    """
-    return year % 4 == 0 and year % 100 != 0 or year % 400 == 0
 
 
 class InvalidPropertyFormatError(ValueError):
@@ -57,8 +48,14 @@ class InvalidEmailFormatError(InvalidPropertyFormatError):
     def __init__(self, message="Invalid email format: must match pattern and length <= 254."):
         super().__init__(message)
 
-class InvalidPhotoFormatError(ValueError):
-    def __init__(self, message=f"Invalid photo filepath format: must have allowed extention ({', '.join(PHOTO_VALID_EXT)}) and not contain forbidden characters."):
+
+class FileAccessError(InvalidPropertyFormatError):
+    def __init__(self, message="Resource path can't be read at this moment."):
+        super().__init__(message)
+
+
+class InvalidPhotoFormatError(InvalidPropertyFormatError):
+    def __init__(self, message="Invalid photo format."):
         super().__init__(message)
 
 
@@ -195,29 +192,51 @@ class Email(Field):
 class Photo(Field):
     """Field class for storing Record photo filepath field."""
 
-
     def __init__(self, value: str):
         self.set_value(value)
+
+    def __str__(self):
+        return self.render()
 
     def set_value(self, value: str):
         """Setter with input validation.
 
+        Get image from Web/FS, thumbnail to 256x256 JPEG, save as bytes.
+
         Raises:
-            InvalidPhotoFormatError: If filepath is invalid or file doesn't exist.
+            FileNotFoundError: If filepath wasn't found.
+            FileAccessError: If filepath can't be accessed.
+            InvalidPhotoFormatError: If file can't be processed.
         """
-        value = value.strip()
-        _, ext = os.path.splitext(value.lower())
-        
-        if ext not in PHOTO_VALID_EXT or any(ch in value for ch in PHOTO_FORBIDDEN_CHARS):
-            raise InvalidPhotoFormatError(
-                f"Invalid photo filepath `{value}`: must have allowed extension "
-                f"({', '.join(PHOTO_VALID_EXT)}) and not contain forbidden characters ({''.join(PHOTO_FORBIDDEN_CHARS)})."
-            )
+        # Load image resource from specified location
+        try:
+            if value.startswith("http://") or value.startswith("https://"):
+                art = AsciiArt.from_url(value)
+            else:
+                art = AsciiArt.from_image(value)
+        except FileNotFoundError as e:
+            raise FileNotFoundError(f"File `{value}` wasn't found") from e
+        except OSError as e:
+            raise FileAccessError from e
 
-        if os.path.isabs(value) and not os.path.exists(value):
-            raise InvalidPhotoFormatError(f"Photo file not found at absolute path `{value}`.")
+        # Generate byte string from provided image
+        try:
+            art.image.thumbnail((256, 256), resample=Image.LANCZOS)
+            img_byte_arr = io.BytesIO()
+            art.image.save(img_byte_arr, format="JPEG")
+        except e:
+            raise InvalidPhotoFormatError from e
+        self.value = img_byte_arr.getvalue()
 
-        self.value = os.path.normpath(value)
+    def render(self, columns: int = 120, width_ratio: float = 2.125):
+        """Return bg/fg-colored string representation of photo.
+
+        Args:
+            columns (int): Width of the output in charactres.
+            width_ration (float): Terminal-specific character ratio.
+        """
+        art = AsciiArt(Image.open(io.BytesIO(self.value)))
+        return utils.get_truecolor_string(art, columns=120, width_ratio=2.125)
 
 
 class Record:
@@ -325,7 +344,7 @@ class Record:
         """Set photo for the record.
 
         Args:
-            value (str): String value of the photo filepath to set.
+            value (str): String value of the photo filepath or URL to set.
         """
         self.photo = Photo(value)
 
@@ -415,8 +434,8 @@ class AddressBook(UserDict):
         """
         result = []
         today = date.today()
-        this_is_leap_year = is_leap_year(today.year)
-        next_is_leap_year = is_leap_year(today.year + 1)
+        this_is_leap_year = utils.is_leap_year(today.year)
+        next_is_leap_year = utils.is_leap_year(today.year + 1)
 
         for rec in self.data.values():
             # Process only records with non-None birthdays

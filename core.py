@@ -1,4 +1,3 @@
-import ascii_magic
 import functools
 import pickle
 from collections.abc import Callable
