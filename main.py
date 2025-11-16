@@ -6,63 +6,89 @@ except ImportError:
 
 import core
 from contacts import AddressBook
+from prettytable import PrettyTable
 
 FILEPATH = "addressbook.pkl"
-MSG_HELP = """\
-DESCRIPTION:
-    This script provides CLI for contact management.
 
-USAGE:
-    - record <name>
-        Show Record's "card". Create Record if missing.
-    - record <record_name> <value>
-        Rename Record.
-    - record <record_name> ""
-        Delete Record.
+def get_help_message() -> str:
+    """Generate formatted help message using PrettyTable."""
+    table = PrettyTable()
+    table.field_names = ["Command", "Description"]
+    table.align["Command"] = "l"
+    table.align["Description"] = "l"
+    table.max_width["Description"] = 50
+    
+    # Record commands
+    table.add_row(["=== RECORD MANAGEMENT ===", ""])
+    table.add_row(["record <name>", "Show or create Record"])
+    table.add_row(["record <name> <new_name>", "Rename Record"])
+    table.add_row(["record <name> \"\"", "Delete Record"])
+    
+    # Record properties
+    table.add_row(["", ""])
+    table.add_row(["=== RECORD PROPERTIES ===", ""])
+    table.add_row(["address <name>", "Show address"])
+    table.add_row(["address <name> <value>", "Set address"])
+    table.add_row(["address <name> \"\"", "Unset address"])
+    table.add_row(["birthday <name>", "Show birthday (DD.MM.YYYY)"])
+    table.add_row(["birthday <name> <value>", "Set birthday"])
+    table.add_row(["birthday <name> \"\"", "Unset birthday"])
+    table.add_row(["email <name>", "Show email"])
+    table.add_row(["email <name> <value>", "Set email"])
+    table.add_row(["email <name> \"\"", "Unset email"])
+    
+    # Phone management
+    table.add_row(["", ""])
+    table.add_row(["=== PHONE MANAGEMENT ===", ""])
+    table.add_row(["phone <name>", "Show all phones"])
+    table.add_row(["phone <name> <number>", "Add phone (10 digits, starts with 0)"])
+    table.add_row(["phone <name> <old> <new>", "Replace phone number"])
+    table.add_row(["phone <name> <number> \"\"", "Delete phone"])
+    
+    # Search and view
+    table.add_row(["", ""])
+    table.add_row(["=== SEARCH & VIEW ===", ""])
+    table.add_row(["all", "Show all Records"])
+    table.add_row(["all <name>", "Show specific Record"])
+    table.add_row(["find <keyword>", "Search Records by keyword"])
+    table.add_row(["birthdays [<days>]", "Show upcoming birthdays (default: 7 days)"])
+    
+    # System commands
+    table.add_row(["", ""])
+    table.add_row(["=== SYSTEM ===", ""])
+    table.add_row(["hello", "Print greeting"])
+    table.add_row(["help", "Show this message"])
+    table.add_row(["exit | close", "Save and quit"])
+    
+    # Photo management
+    table.add_row(["", ""])
+    table.add_row(["=== PHOTO MANAGEMENT ===", ""])
+    table.add_row(["photo <name>", "Show Record's photo"])
+    table.add_row(["photo <name> <value>", "Set Record's photo (filepath or URL)"])
+    table.add_row(["photo <name> \"\"", "Unset Record's photo"])
 
-    - address <record_name>
-        Show Record's address.
-    - address <record_name> <value>
-        Set Record's address.
-    - address <record_name> ""
-        Unset Record's address.
-    - birthday <record_name>
-        Show Record's birthday.
-    - birthday <record_name> <value>
-        Set Record's birthday.
-    - birthday <record_name> ""
-        Unset Record's birthday.
-    - email <record_name>
-        Show Record's email.
-    - email <record_name> <value>
-        Set Record's email.
-    - email <record_name> ""
-        Unset Record's email.
+    # Notes collection actions:
+    table.add_row(["", ""])
+    table.add_row(["=== NOTES MANAGEMENT ===", ""])
+    table.add_row(["notes", "Show all Notes with IDs"])
+    table.add_row(["notes <id>", "Show Note"])
+    table.add_row(["notes <id><val>", "Update Note"])
+    table.add_row(["notes <id> \"\"", "Delete Note"])
+    
+    # Note list actions:
+    table.add_row(["", ""])
+    table.add_row(["=== Supported lists: tag ===", ""])
+    table.add_row(["<list> <note_id>", "Show all list items"])
+    table.add_row(["<list> <note_id> <val>", "Add new item to the list"])
+    table.add_row(["<list> <note_id> <val> <new_val>", "Replace item with new value"])
+    table.add_row(["<list> <note_id> <val> \"\"", "Delete item from the list"])
 
-    - phone <record_name>
-        Show all phones of the Record.
-    - phone <record_name> <value>
-        Add new phone to the Record.
-    - phone <record_name> <value> <new_value>
-        Replace phone with new value.
-    - phone <record_name> <value> ""
-        Delete phone from the list.
+    output = "CLI for Contact Management\n\n"
+    output += "NOTE: Use double quotes for values with spaces.\n\n"
+    output += str(table)
+    return output
 
-    - all [ <person> ]
-        If person is specified, show Record "card".
-        Otherwise show all "cards".
-    - birthdays [ <days> ]
-        If days is specified, show congratulation dates for persons which birthdays are within \
-        specified period. Otherwise period defaults to 7 days.
-    - help
-        Prints this message.
-    - hello
-        Prints "hello" message.
-    - exit | close
-        Saves data into the file and quits application.
-
-NOTES:
-    Use double quotes if values contain spaces."""
+MSG_HELP = get_help_message()
 
 MSG_BAD_ARG_COUNT = "Wrong number of arguments. Type `help` to read about command usage."
 CMD_CFG = {
