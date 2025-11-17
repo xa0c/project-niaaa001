@@ -242,6 +242,14 @@ class Photo(Field):
 class Record:
     """Record for contact info management.
 
+    Attributes:
+        name (Field)
+        phones (list[Phone])
+        birthday (Field)
+        address (Field)
+        email (Field)
+        photo (Field)
+
     Args:
         name: Name field value.
     """
@@ -257,16 +265,23 @@ class Record:
     def __str__(self):
         return f"Contact name: {self.name}, phones: {'; '.join(p.value for p in self.phones)}"
 
-    def add_phone(self, value: str):
-        """Add phone to the list.
+    def add_phone(self, value: str) -> bool:
+        """Add phone to the list avoiding the duplicates.
 
         Args:
             value (str): String value of the phone to add.
 
         Raises:
             InvalidPhoneFormatError: If phone format is invalid.
+
+        Returns:
+            bool: True if phone was added. False if skipped duplicate.
         """
+        if value in self.phones:
+            return False
+
         self.phones.append(Phone(value))
+        return True
 
     def remove_phone(self, value: str):
         """Remove phone from the list.
@@ -275,10 +290,9 @@ class Record:
             value (str): String value of the phone to remove.
 
         Raises:
-            ValueError: If value lookup fails.
-            IndexError: If item disappears before referencing.
+            ValueError: If phone not found.
         """
-        del self.phones[self.phones.index(value)]
+        self.phones.remove(value)
 
     def edit_phone(self, old_value: str, new_value: str):
         """Replace existing phone with new value.
@@ -290,6 +304,7 @@ class Record:
         Raises:
             ValueError: If value lookup fails.
             IndexError: If item disappears before referencing.
+            InvalidPhoneFormatError: If phone format is invalid.
         """
         self.phones[self.phones.index(old_value)] = Phone(new_value)
 
@@ -397,7 +412,9 @@ class AddressBook(UserDict):
         return self.data.get(name)
 
     def find(self, search_value: str = None) -> list[Record]:
-        """Search Records by name, birthday, phones, email, address.
+        """Find all Records matching search value.
+
+        Searchable fields: name, birthday, phones, email, address.
 
         Args:
             search_value (str): Matching value to find.

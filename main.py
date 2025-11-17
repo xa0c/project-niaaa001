@@ -112,7 +112,7 @@ def parse_input(user_input: str) -> tuple[str, list[str]]:
 
 def main():
     print("Welcome to the assistant bot!\nType `help` to learn more about available commands.")
-    book, notebook = core.load_store(STORE_PATH)
+    data = core.load_store(STORE_PATH)
 
     # Store functions for easier command handling
     cmd_funcs = {
@@ -148,7 +148,7 @@ def main():
         # Handle commands
         match cmd:
             case "exit" | "close":
-                print(core.save_store(book, notebook, STORE_PATH))
+                print(core.save_store(data, STORE_PATH))
                 print("Exiting program. Good bye!")
                 break
             case "hello":
@@ -156,14 +156,14 @@ def main():
             case "help":
                 print(MSG_HELP)
             case "new-record" | "records" | "birthdays" | "find-records" | "phone":
-                print(cmd_funcs[cmd](args, book))
-                core.save_store(book, notebook, STORE_PATH)
+                print(cmd_funcs[cmd](args, data["book"]))
+                core.save_store(data, STORE_PATH)
             case "address" | "email" | "birthday" | "photo":
-                print(cmd_funcs[cmd](cmd, args, book))
-                core.save_store(book, notebook, STORE_PATH)
+                print(cmd_funcs[cmd](cmd, args, data["book"]))
+                core.save_store(data, STORE_PATH)
             case "new-note" | "notes" | "find-notes" | "tag":
-                print(cmd_funcs[cmd](args, notebook))
-                core.save_store(book, notebook, STORE_PATH)
+                print(cmd_funcs[cmd](args, data["notebook"]))
+                core.save_store(data, STORE_PATH)
             case _:
                 print("ERROR: Unknown command. Try again.")
 

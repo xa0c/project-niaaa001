@@ -2,8 +2,7 @@ import functools
 import pickle
 from collections.abc import Callable
 
-from contacts import AddressBook, Record
-from contacts import InvalidPropertyFormatError
+from contacts import AddressBook, Record, InvalidPropertyFormatError
 from notes import NoteBook, Note
 
 
@@ -35,10 +34,24 @@ class RecordNotExistsError(ValueError):
         super().__init__(message)
 
 
-class FieldNotExistsError(ValueError):
-    """Custom exception if specified Field doesn't exist."""
+class PhoneNotExistsError(ValueError):
+    """Custom exception if specified Phone doesn't exist."""
 
-    def __init__(self, message="Specified Field doesn't exist."):
+    def __init__(self, message="Specified Phone doesn't exist."):
+        super().__init__(message)
+
+
+class NoteNotExistsError(ValueError):
+    """Custom exception if specified Note doesn't exist."""
+
+    def __init__(self, message="Specified Note doesn't exist."):
+        super().__init__(message)
+
+
+class TagNotExistsError(ValueError):
+    """Custom exception if specified Tag doesn't exist."""
+
+    def __init__(self, message="Specified Tag doesn't exist."):
         super().__init__(message)
 
 
@@ -74,9 +87,14 @@ def input_error(func: Callable) -> Callable:
         try:
             return func(*args, **kwargs)
         except (
-            InvalidCmdArgsCountError, RecordExistsError, RecordNotExistsError, FieldNotExistsError,
-            InvalidPropertyFormatError, InvalidCmdArgTypeError, NoteNotExistsError, TagNotExistsError,
-            ValueError
+            InvalidCmdArgsCountError,
+            InvalidCmdArgTypeError,
+            InvalidPropertyFormatError,
+            RecordExistsError,
+            RecordNotExistsError,
+            NoteNotExistsError,
+            PhoneNotExistsError,
+            TagNotExistsError,
         ) as e:
             return f"ERROR: {e.args[0]} Try again."
     return inner
@@ -84,12 +102,13 @@ def input_error(func: Callable) -> Callable:
 
 @input_error
 def handle_new_record(args: list[str], book: AddressBook) -> str:
-    """Handle new record command.
+    """Handle new-record command.
 
     Create new Record.
 
     Args:
         args (list[str]): List with raw cmd arguments.
+            Expected: [name].
         book (AddressBook): AddressBook object.
 
     Returns:
@@ -100,7 +119,7 @@ def handle_new_record(args: list[str], book: AddressBook) -> str:
         InvalidPropertyFormatError: If name format is invalid.
     """
     try:
-        name, value, *_ = args
+        name, *_ = args
     except:
         raise InvalidCmdArgsCountError
 
@@ -117,22 +136,23 @@ def handle_new_record(args: list[str], book: AddressBook) -> str:
 
 @input_error
 def handle_records(args: list[str], book: AddressBook) -> str:
-    """Handle record commands: show, rename, delete.
+    """Handle record commands: all, show, rename, delete.
 
     If args is empty:
-        Show "cards" for all Records.
+        Show "views" for all Records.
     If args has 1 item:
-        Show "card" for specified Record.
+        Show "view" for specified Record.
     If args contains 2 items:
         Rename specified Record with the new value.
         If value is empty string, then delete specified Record.
 
     Args:
         args (list[str]): List with raw cmd arguments.
+            Expected: [] or [name] or [name, value] or [name, ""].
         book (AddressBook): AddressBook object.
 
     Returns:
-        str: Operation result message or Record "card".
+        str: Operation result message or Record "view".
 
     Raises:
         InvalidCmdArgsCountError: If command has invalid argument count.
@@ -160,19 +180,20 @@ def handle_records(args: list[str], book: AddressBook) -> str:
     # Handle Show functionality
     if value is None:
         return render_record_table(record)
+
     # Handle Delete functionality
     if value == "":
         book.delete_record(name)
         return f"Deleted `{name}` Record."
+
     # Handle Rename functionality
-    if value is not None:
-        book.rename_record(name, value)
-        return f"Renamed `{name}` Record to `{value}`."
+    book.rename_record(name, value)
+    return f"Renamed `{name}` Record to `{value}`."
 
 
 @input_error
 def handle_phone(args: list[str], book: AddressBook) -> str:
-    """Handle phone commands: show, add, edit, delete.
+    """Handle phone commands: show, add, replace, delete.
 
     If args has 1 item:
         Show all phones for the specified Record.
@@ -184,6 +205,9 @@ def handle_phone(args: list[str], book: AddressBook) -> str:
 
     Args:
         args (list[str]): List with raw cmd arguments.
+            Expected: [record_name] or [record_name, value] or
+            [record_name, value, replace_value] or
+            [record_name, value, ""].
         book (AddressBook): AddressBook object.
 
     Returns:
@@ -192,8 +216,8 @@ def handle_phone(args: list[str], book: AddressBook) -> str:
     Raises:
         InvalidCmdArgsCountError: If command has invalid argument count.
         RecordNotExistsError: If specified Record doesn't exist.
-        FieldNotExistsError: If specified phone doesn't exist.
-        InvalidPropertyFormatError: If new phone number format is invalid.
+        PhoneNotExistsError: If specified phone doesn't exist.
+        InvalidPropertyFormatError: If new phone format is invalid.
     """
     try:
         name, value, replace_value, *_ = args
@@ -207,26 +231,30 @@ def handle_phone(args: list[str], book: AddressBook) -> str:
         raise RecordNotExistsError
 
     # Handle Get functionality
-    if value is None and replace_value is None:
+    if value is None:
         output = "\n".join(phone.value for phone in record.phones)
         return output if output else f"No phones found for the `{name}` Record."
+
     # Handle Add functionality
-    if value is not None and replace_value is None:
-        record.add_phone(value)
-        return f"Added `{value}` phone to the `{name}` Record."
-    # Handle Edit/Delete functionality
-    if value is not None and replace_value is not None:
-        # Check if specified phone field exists
-        phone = record.find_phone(value)
-        if phone is None:
-            raise FieldNotExistsError
-        # Handle Delete functionality
-        if replace_value == "":
-            record.remove_phone(value)
-            return f"Deleted `{value}` phone from the `{name}` Record."
-        # Handle Update functionality
-        phone.set_value(replace_value)
-        return f"Changed `{value}` phone to `{replace_value}` for the `{name}` Record."
+    if replace_value is None:
+        if record.add_phone(value):
+            return f"Added `{value}` phone to the `{name}` Record."
+        else:
+            return f"Skipped duplicate `{value}` phone in the `{name}` Record."
+
+    # Check if specified phone field exists
+    phone = record.find_phone(value)
+    if phone is None:
+        raise PhoneNotExistsError
+
+    # Handle Delete functionality
+    if replace_value == "":
+        record.remove_phone(value)
+        return f"Deleted `{value}` phone from the `{name}` Record."
+
+    # Handle Update functionality
+    phone.set_value(replace_value)
+    return f"Replaced `{value}` phone to `{replace_value}` in the `{name}` Record."
 
 
 @input_error
@@ -244,7 +272,7 @@ def handle_record_prop(prop: str, args: list[str], book: AddressBook) -> str:
         book (AddressBook): AddressBook object.
 
     Returns:
-        str: Operation result message or property textual representation.
+        str: Operation result message or property text representation.
 
     Raises:
         InvalidCmdArgsCountError: If command has invalid argument count.
@@ -268,27 +296,26 @@ def handle_record_prop(prop: str, args: list[str], book: AddressBook) -> str:
         if prop_val is None:
             return f"No {prop} set for the `{name}` Record."
         return str(prop_val)
+
     # Handle Unset functionality
     if value == "":
         setattr(record, prop, None)
         return f"Unset {prop} of the `{name}` Record."
+
     # Handle Set functionality
-    if value is not None:
-        set_prop_method = getattr(record, "set_" + prop)
-        set_prop_method(value)
-        return f"Set {prop} to `{value}` for the `{name}` Record."
+    set_prop_method = getattr(record, "set_" + prop)
+    set_prop_method(value)
+    return f"Set {prop} to `{value}` for the `{name}` Record."
 
 
 def render_record_table(record: Record) -> str:
-    """Render Record fields table.
-
-    Render specified Record "card".
+    """Render specified Record "view".
 
     Args:
         record (Record): Record object.
 
     Returns:
-        str: Rendered Record "card".
+        str: Rendered Record "view".
     """
     output = "/" + '═' * 30 + "\\\n"
     output += "│" + f" Name: {record.name}".ljust(30) + "│\n"
@@ -308,15 +335,34 @@ def render_record_table(record: Record) -> str:
     return output
 
 
+def render_note_table(note: Note) -> str:
+    """Render specified Note "view".
+
+    Args:
+        note (Note): Note object.
+
+    Returns:
+        str: Rendered Note "view".
+    """
+    output = "/" + '═' * 60 + "\\\n"
+    output += "│" + f" ID: {note.id}".ljust(60) + "│\n"
+    if note.tags:
+        output += "│" + f" Tags: {' ; '.join(t.value for t in note.tags)}".ljust(60) + "│\n"
+    output += "├" + "─" * 60 + "┤\n"
+    output += "│" + f"{note.body}".ljust(60) + "│\n"
+    output += "└" + "─" * 60 + "┘\n"
+    return output
+
+
 @input_error
 def handle_birthdays(args: list[str], book: AddressBook) -> str:
     """Handle birthdays command.
 
     If args is empty:
-        Output table of records with upcoming birthdays, which occur \
+        Output table of records with upcoming birthdays, which occur
         within default range: 7 days.
     If args has 1 item:
-        Output table of records with upcoming birthdays, which occur \
+        Output table of records with upcoming birthdays, which occur
         within specified range in days.
 
     Args:
@@ -357,58 +403,47 @@ def handle_birthdays(args: list[str], book: AddressBook) -> str:
 
 @input_error
 def handle_find_records(args: list[str], book: AddressBook) -> str:
-    """Handle find command.
+    """Handle find-records command.
 
     Search Records by all supported fields.
 
     Args:
         args (list[str]): List with raw cmd arguments.
+            Expected: [keyword].
         book (AddressBook): AddressBook object.
 
     Returns:
-        str: Operation result message or matched Record "cards".
+        str: Operation result message or matched Record "views".
 
     Raises:
         InvalidCmdArgsCountError: If command has invalid argument count.
     """
     try:
-        search_value, *_ = args
+        keyword, *_ = args
     except:
         raise InvalidCmdArgsCountError
 
-    records = book.find(search_value)
+    records = book.find(keyword)
 
     if not records:
-        return f"No Record matches for the `{search_value}` keyword."
+        return f"No Record matches for the `{keyword}` keyword."
 
-    # Render all matched Record "cards"
+    # Render all matched Record "views"
     output = ""
     for record in records:
         output += render_record_table(record)
-    return output
-
-
-# Note commands
-class NoteNotExistsError(ValueError):
-    """Custom exception if specified Note doesn't exist."""
-
-    def __init__(self, message="Specified Note doesn't exist."):
-        super().__init__(message)
-
-
-class TagNotExistsError(ValueError):
-    """Custom exception if specified Tag doesn't exist."""
-
-    def __init__(self, message="Specified Tag doesn't exist."):
-        super().__init__(message)
+    return output if output else "No Records."
 
 
 @input_error
 def handle_new_note(args: list[str], notebook: NoteBook) -> str:
-    """Create new Note.
+    """Handle new-note command.
+
+    Create new Note.
 
     Args:
-        args (list[str]): Command arguments. Expected: [body]
+        args (list[str]): List with raw cmd arguments.
+            Expected: [body].
         notebook (NoteBook): NoteBook object.
 
     Returns:
@@ -416,89 +451,100 @@ def handle_new_note(args: list[str], notebook: NoteBook) -> str:
 
     Raises:
         InvalidCmdArgsCountError: If command has invalid argument count.
+        InvalidPropertyFormatError: If body format is invalid.
     """
     try:
         body, *_ = args
     except:
         raise InvalidCmdArgsCountError
 
-    if body is None:
-        raise InvalidCmdArgsCountError
-
     note = Note(body)
     notebook.add_note(note)
-    note_id = len(notebook) - 1
-    return f"Created new Note with ID {note_id}."
+    return f"New Note with ID #{note.id} was created."
 
 
 @input_error
 def handle_notes(args: list[str], notebook: NoteBook) -> str:
-    """Handle notes command: show all, show one, update, or delete.
+    """Handle note commands: all, show, update, or delete.
+
+    If args is empty:
+        Show "views" for all Notes.
+    If args has 1 item:
+        Show "view" for specified Note.
+    If args contains 2 items:
+        Update specified Nate with the new value.
+        If value is empty string, then delete specified Note.
 
     Args:
-        args (list[str]): Command arguments. Expected: [] or [id] or [id, body] or [id, ""]
+        args (list[str]): List with raw cmd arguments.
+            Expected: [] or [id] or [id, body] or [id, ""]
         notebook (NoteBook): NoteBook object.
 
     Returns:
-        str: Operation result message or notes list.
+        str: Operation result message or Note "view".
 
     Raises:
         InvalidCmdArgsCountError: If command has invalid argument count.
         NoteNotExistsError: If specified Note doesn't exist.
         InvalidCmdArgTypeError: If ID is not a valid integer.
+        InvalidPropertyFormatError: If new body format is invalid.
     """
     try:
-        note_id_arg = args[0] if args else None
+        id_, body, *_ = args
     except:
         raise InvalidCmdArgsCountError
 
-    # Show all notes with IDs
-    if note_id_arg is None:
-        if len(notebook) == 0:
-            return "No notes found."
+    # Handle ShowAll functionality
+    if id_ is None:
         output = ""
-        for i, note in enumerate(notebook):
-            tags_str = ', '.join(note.tags) if note.tags else "no tags"
-            output += f"[{i}] {note.body} [{tags_str}]\n"
-        return output.rstrip()
+        for note in notebook.values():
+            output += render_note_table(note)
+        return output if output else "No Notes."
 
-    # Show, update, or delete note
+    # Validate `id` argument
     try:
-        note_id = int(note_id_arg)
+        id_ = int(id_)
+        if id_ < 0:
+            raise ValueError
     except ValueError:
-        raise InvalidCmdArgTypeError("Note ID must be an integer.")
+        raise InvalidCmdArgTypeError("Note ID must be a positive integer.")
 
-    if note_id < 0 or note_id >= len(notebook):
+    note = notebook.get_note(id_)
+
+    # If Note wasn't found, raise error for all cases except "ShowAll" functionality
+    if note is None:
         raise NoteNotExistsError
 
-    note = notebook[note_id]
-
-    # Join all arguments after note_id (filtering out None) to form body
-    body_parts = [arg for arg in args[1:] if arg is not None]
-    body = ' '.join(body_parts) if body_parts else None
-
-    # Show note
+    # Handle Show functionality
     if body is None:
-        tags_str = ', '.join(note.tags) if note.tags else "no tags"
-        return f"[{note_id}] {note.body} [{tags_str}]"
+        return render_note_table(note)
 
-    # Delete note
+    # Handle Delete functionality
     if body == "":
-        notebook.delete_note(note_id)
-        return f"Deleted Note with ID {note_id}."
+        notebook.delete_note(id_)
+        return f"Deleted Note #`{id_}`."
 
-    # Update note
-    notebook.update_note(note_id, body)
-    return f"Updated Note with ID {note_id}."
+    # Handle Update functionality
+    notebook.update_note(id_, body)
+    return f"Updated Note #`{id_}` with new body content."
 
 
 @input_error
 def handle_tag(args: list[str], notebook: NoteBook) -> str:
-    """Handle tag command: show, add, replace, or delete tags.
+    """Handle tag command: show, add, replace, delete.
+
+    If args has 1 item:
+        Show all tags for the specified Note.
+    If args has 2 items:
+        Add tag to the specified Note.
+    If args has 3 items:
+        Replace specified tag with new value in specified Note.
+        If new value is empty string, then delete specified tag.
 
     Args:
-        args (list[str]): Command arguments. Expected: [note_id] or [note_id, tag] or
-            [note_id, old_tag, new_tag] or [note_id, tag, ""]
+        args (list[str]): List with raw cmd arguments.
+            Expected: [note_id] or [note_id, value] or
+            [note_id, value, replace_value] or [note_id, value, ""].
         notebook (NoteBook): NoteBook object.
 
     Returns:
@@ -509,60 +555,67 @@ def handle_tag(args: list[str], notebook: NoteBook) -> str:
         NoteNotExistsError: If specified Note doesn't exist.
         TagNotExistsError: If specified Tag doesn't exist.
         InvalidCmdArgTypeError: If ID is not a valid integer.
+        InvalidPropertyFormatError: If new body format is invalid.
     """
     try:
-        note_id_arg, tag_arg, new_tag_arg, *_ = args
+        note_id, value, replace_value, *_ = args
     except:
         raise InvalidCmdArgsCountError
 
-    if note_id_arg is None:
-        raise InvalidCmdArgsCountError
-
+    # Validate `id` argument
     try:
-        note_id = int(note_id_arg)
+        note_id = int(note_id)
+        if note_id < 0:
+            raise ValueError
     except ValueError:
-        raise InvalidCmdArgTypeError("Note ID must be an integer.")
+        raise InvalidCmdArgTypeError("Note ID must be a positive integer.")
 
-    if note_id < 0 or note_id >= len(notebook):
+    note = notebook.get_note(note_id)
+
+    # If Note wasn't found, raise error
+    if note is None:
         raise NoteNotExistsError
 
-    note = notebook[note_id]
+    # Handle Get functionality
+    if value is None:
+        output = "\n".join(tag.value for tag in note.tags)
+        return output if output else f"No tags found for the Note #`{note_id}`."
 
-    # Show all tags
-    if tag_arg is None:
-        if not note.tags:
-            return "No tags found."
-        return ', '.join(note.tags)
+    # Handle Add functionality
+    if replace_value is None:
+        if note.add_tag(value):
+            return f"Added `{value}` tag to the Note #`{note_id}`."
+        else:
+            return f"Skipped duplicate `{value}` tag in the Note #`{note_id}`."
 
-    # Add tag (validation happens in note.add_tag)
-    if new_tag_arg is None:
-        note.add_tag(tag_arg)
-        return f"Added tag '{tag_arg}' to Note {note_id}."
-
-    # Delete tag
-    if new_tag_arg == "":
-        if tag_arg not in note.tags:
-            raise TagNotExistsError
-        note.remove_tag(tag_arg)
-        return f"Deleted tag '{tag_arg}' from Note {note_id}."
-
-    # Replace tag (validation happens in note.replace_tag)
-    if tag_arg not in note.tags:
+    # Check if specified tag field exists
+    tag = note.find_tag(value)
+    if tag is None:
         raise TagNotExistsError
-    note.replace_tag(tag_arg, new_tag_arg)
-    return f"Replaced tag '{tag_arg}' with '{new_tag_arg}' in Note {note_id}."
+
+    # Handle Delete functionality
+    if replace_value == "":
+        note.remove_tag(value)
+        return f"Deleted `{value}` tag from the Note #`{note_id}`."
+
+    # Handle Update functionality
+    tag.set_value(replace_value)
+    return f"Replaced `{value}` tag with `{replace_value}` in the Note #`{note_id}`."
 
 
 @input_error
 def handle_find_notes(args: list[str], notebook: NoteBook) -> str:
-    """Search notes by keyword.
+    """Handle find-notes command.
+
+    Search Notes by all supported fields.
 
     Args:
-        args (list[str]): Command arguments. Expected: [keyword]
+        args (list[str]): List with raw cmd arguments.
+            Expected: [keyword].
         notebook (NoteBook): NoteBook object.
 
     Returns:
-        str: Found notes list.
+        str: Operation result message or matched Note "views".
 
     Raises:
         InvalidCmdArgsCountError: If command has invalid argument count.
@@ -572,68 +625,63 @@ def handle_find_notes(args: list[str], notebook: NoteBook) -> str:
     except:
         raise InvalidCmdArgsCountError
 
-    if keyword is None:
-        raise InvalidCmdArgsCountError
+    notes = notebook.find(keyword)
 
-    found_notes = notebook.find(keyword)
+    if not notes:
+        return f"No Note matches for the `{keyword}` keyword."
 
-    if not found_notes:
-        return f"No notes found with keyword '{keyword}'."
-
+    # Render all matched Note "views"
     output = ""
-    for note in found_notes:
-        note_id = notebook.data.index(note)
-        tags_str = ', '.join(note.tags) if note.tags else "no tags"
-        output += f"[{note_id}] {note.body} [{tags_str}]\n"
-    return output.rstrip()
+    for note in notes:
+        output += render_note_table(note)
+    return output if output else "No Notes."
 
 
-def load_store(path: str) -> tuple[AddressBook, NoteBook]:
-    """Load AddressBook and NoteBook objects from the Pickle-serialized data file.
+def load_store(path: str) -> dict:
+    """Load app objects from the Pickle-serialized data file.
 
     Args:
         path (str): Path to the data file.
 
     Returns:
-        tuple[AddressBook, NoteBook]: Restored objects or empty objects on file access error.
+        dict: Restored objects or empty objects on file access error.
     """
+    data = {}
     try:
         with open(path, "rb") as fh:
             data = pickle.load(fh)
-            book = data.get("book", AddressBook())
-            notebook = data.get("notebook", NoteBook())
-            return book, notebook
     except FileNotFoundError:
-        print(f"INFO: File `{path}` wasn't found. Starting with empty AddressBook and NoteBook.")
+        print(f"INFO: File `{path}` wasn't found. Starting with empty app data.")
     except OSError:
         print(
             f"ERROR: There was a problem reading `{path}` file. "
-            "Starting with empty AddressBook and NoteBook.\n"
-            "Be careful, since your existing data may be overwritten."
+            "Starting with empty app data.\n"
+            "Be careful, since your existing app data may be overwritten."
         )
-    except (KeyError, TypeError):
-        print(
-            f"ERROR: File `{path}` has invalid format. "
-            "Starting with empty AddressBook and NoteBook.\n"
-            "Be careful, since your existing data may be overwritten."
-        )
-    return AddressBook(), NoteBook()
+
+    data.setdefault("book", AddressBook())
+    data.setdefault("notebook", NoteBook())
+    data.setdefault("NoteBook.id_iter", 1)
+
+    NoteBook.reset_id(data["NoteBook.id_iter"] + 1)
+
+    return data
 
 
 @file_error
-def save_store(book: AddressBook, notebook: NoteBook, path: str) -> str:
-    """Save AddressBook and NoteBook objects to the Pickle-serialized data file.
+def save_store(data: dict, path: str) -> str:
+    """Save app objects to the Pickle-serialized data file.
 
     Args:
-        book (AddressBook): AddressBook object to save.
-        notebook (NoteBook): NoteBook object to save.
+        data (dict): Dict with app object to save.
         path (str): Path to the data file.
 
     Returns:
         str: Operation result message.
     """
+    data["NoteBook.id_iter"] = NoteBook.last_id
+
     try:
-        data = {"book": book, "notebook": notebook}
         with open(path, "wb") as fh:
             pickle.dump(data, fh)
     except OSError as e:

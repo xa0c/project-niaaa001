@@ -1,14 +1,96 @@
-from collections import UserList
+import itertools
+import re
+from collections import UserDict
 
+
+TAG_PATTERN = re.compile(r'^[a-zA-Z0-9 @#$%&._+-]{3,30}$')
+
+
+class InvalidPropertyFormatError(ValueError):
+    """Custom exception for invalid property format."""
+
+    def __init__(self, message="Invalid property format."):
+        super().__init__(message)
+
+
+class InvalidBodyFormatError(InvalidPropertyFormatError):
+    def __init__(self, message="Invalid body format: length must be <= 300."):
+        super().__init__(message)
+
+
+class InvalidTagFormatError(InvalidPropertyFormatError):
+    def __init__(self, message="Invalid tag format: must be alphanumeric string with length \
+            between 3 30. Other allowed symbols: @ # $ % & . _ + - and space."):
+        super().__init__(message)
+
+
+class Field:
+    """Base class for storing Note fields.
+
+    Args:
+        value: Stored value of arbitary type.
+    """
+
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return str(self.value)
+
+
+class Body(Field):
+    """Field class for storing Note body field."""
+
+    def __init__(self, value: str):
+        self.set_value(value)
+
+    def set_value(self, value: str):
+        if len(value) > 300:
+            raise InvalidBodyFormatError
+        self.value = value
+
+
+class Tag(Field):
+    """Field class for storing Note tag field.
+
+    Equality:
+        Allows list.index search by str and Tag.
+    """
+
+    def __init__(self, value: str):
+        """Same parameters as `Field.__init__`.
+
+        Raises:
+            InvalidTagFormatError: If tag format is invalid.
+        """
+        self.set_value(value)
+
+    def __eq__(self, other):
+        """See class docstring: Equality."""
+        if isinstance(other, str):
+            return self.value == other
+        if isinstance(other, Tag):
+            return self.value == other.value
+        return NotImplemented
+
+    def set_value(self, value: str):
+        """Setter with input format validation.
+
+        Raises:
+            InvalidTagFormatError: If tag format is invalid.
+        """
+        value = value.strip()
+        if not (3 <= len(value) <= 30) or not TAG_PATTERN.match(value):
+            raise InvalidTagFormatError
+        self.value = value
 
 class Note:
     """Note for storing text content with tags.
 
-    Structure:
-        {
-            tags: list[str]
-            body: str
-        }
+    Attributes:
+        id (int)
+        body (str)
+        tags (list[Tag])
 
     Args:
         body: Note text content.
@@ -16,42 +98,41 @@ class Note:
     """
 
     def __init__(self, body: str, tags: list[str] = None):
-        self.tags = tags.copy() if tags else []
+        self.id = None
         self.body = body
+        self.tags = tags.copy() if tags else []
 
     def __str__(self):
-        tags_str = ', '.join(self.tags) if self.tags else "no tags"
-        return f"Note: {self.body[:50]}{'...' if len(self.body) > 50 else ''} [{tags_str}]"
+        tags = ', '.join(self.tags)
+        return f"Note #{self.id}: {self.body[:50]}{'...' if len(self.body) > 50 else ''} [{tags}]"
 
-    def set_body(self, body: str):
+    def set_body(self, value: str):
         """Set body text for the note.
 
         Args:
-            body (str): String value of the body to set.
+            value (str): String value of the body to set.
         """
-        self.body = body
+        self.body = Body(value)
 
-    def add_tag(self, tag: str):
-        """Add tag to the list.
+    def add_tag(self, value: str) -> bool:
+        """Add tag to the list avoiding the duplicates.
 
         Args:
-            tag (str): String value of the tag to add.
+            value (str): String value of the tag to add.
 
         Raises:
-            ValueError: If tag is empty or invalid.
-        """
-        # Validate tag is not empty
-        if not tag:
-            raise ValueError("Tag cannot be empty.")
-        tag = tag.strip()
-        # Check for empty string, whitespace only, or quoted empty strings like '' or ""
-        if not tag or tag in ("''", '""', "'", '"'):
-            raise ValueError("Tag cannot be empty.")
-        # Add if not duplicate
-        if tag not in self.tags:
-            self.tags.append(tag)
+            InvalidTagFormatError: If is empty or has invalid format.
 
-    def remove_tag(self, tag: str):
+        Returns:
+            bool: True if tag was added. False if skipped duplicate.
+        """
+        if value in self.tags:
+            return False
+
+        self.tags.append(Tag(value))
+        return True
+
+    def remove_tag(self, value: str):
         """Remove tag from the list.
 
         Args:
@@ -60,74 +141,114 @@ class Note:
         Raises:
             ValueError: If tag not found.
         """
-        self.tags.remove(tag)
+        self.tags.remove(value)
 
-    def replace_tag(self, old_tag: str, new_tag: str):
+    def find_tag(self, value: str) -> Tag | None:
+        """Return tag record by string.
+
+        Args:
+            value (str): String value of the tag to find.
+
+        Returns:
+            Tag or None: Object if found. None otherwise.
+        """
+        try:
+            return self.tags[self.tags.index(value)]
+        except (ValueError, IndexError):
+            return None
+
+    def replace_tag(self, old_value: str, new_value: str):
         """Replace existing tag with new value.
 
         Args:
-            old_tag (str): String value of the existing tag.
-            new_tag (str): String value of the new tag.
+            old_value (str): String value of the existing tag.
+            new_value (str): String value of the new tag.
 
         Raises:
-            ValueError: If old_tag not found or new_tag is empty.
+            ValueError: If value lookup fails
+            IndexError: If item disappears before referencing.
+            InvalidTagFormatError: If is empty or has invalid format.
         """
-        # Validate new tag is not empty (same validation as add_tag)
-        if not new_tag:
-            raise ValueError("New tag cannot be empty.")
-        new_tag = new_tag.strip()
-        if not new_tag or new_tag in ("''", '""', "'", '"'):
-            raise ValueError("New tag cannot be empty.")
-        index = self.tags.index(old_tag)
-        self.tags[index] = new_tag
+        self.tags[self.tags.index(old_value)] = Tag(new_value)
 
 
-class NoteBook(UserList):
-    """NoteBook list for note storage and management."""
+class NoteBook(UserDict):
+    """NoteBook dict for note storage and management."""
+
+    id_iter = itertools.count()
+    last_id = 0
+
+    @classmethod
+    def reset_id(cls, value: int = 1):
+        """Reset id_iter state.
+
+        Args:
+            value (int): Starting value for iteration.
+        """
+        cls.id_iter = itertools.count(value)
+        cls.last_id = value
 
     def add_note(self, note: Note):
-        """Add new Note to the list.
+        """Add new Note to the dict.
 
         Args:
             note (Note): New Note object to add.
         """
-        self.data.append(note)
+        note.id = next(self.id_iter)
+        NoteBook.last_id = note.id
+        self.data[note.id] = note
 
-    def delete_note(self, index: int):
-        """Delete Note from the list by index.
+    def delete_note(self, id_: int):
+        """Delete Note from the dict.
 
         Args:
-            index (int): Index of the Note to remove.
+            id_ (int): Key of the Note to delete.
 
         Raises:
-            IndexError: If index is out of range.
+            KeyError: If key not found during referencing.
         """
-        del self.data[index]
+        del self.data[id_]
 
-    def update_note(self, index: int, new_body: str):
-        """Update Note body by index.
+    def update_note(self, id_: int, body: str):
+        """Update Note body.
 
         Args:
-            index (int): Index of the Note to update.
-            new_body (str): New body text for the note.
+            id_ (int): Existing key of the Note to update.
+            body (str): New body text.
 
         Raises:
-            IndexError: If index is out of range.
+            KeyError: If key not found during referencing.
         """
-        self.data[index].set_body(new_body)
+        self.data[id_].set_body(body)
 
-    def find(self, search_text: str) -> list[Note]:
-        """Find all notes containing the search text in body or tags.
+    def get_note(self, id_: int = None) -> Note | None:
+        """Return Note by ID.
 
         Args:
-            search_text (str): Text to search for in note body or tags.
+            id_ (str): Key of the Note to get.
 
         Returns:
-            list[Note]: List of notes containing the search text in body or tags.
+            Note or None: Object if found. None otherwise.
         """
-        search_lower = search_text.lower()
-        return [
-            note for note in self.data
-            if search_lower in note.body.lower() or
-            any(search_lower in tag.lower() for tag in note.tags)
-        ]
+        return self.data.get(id_)
+
+    def find(self, search_value: str = None) -> list[Note]:
+        """Find all Notes matching search value.
+
+        Searchable fields: body, tags.
+
+        Args:
+            search_value (str): Matching value to find.
+
+        Returns:
+            list[Note]: List of matched Notes.
+        """
+        notes = []
+        search_value = search_value.lower()
+        for note in self.values():
+            if (
+                search_value in note.body.value.lower() or
+                any(search_value in tag.value.lower() for tag in note.tags)
+            ):
+                notes.append(note)
+        return notes
