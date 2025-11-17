@@ -1,6 +1,8 @@
 import functools
+import json
 import pickle
 from collections.abc import Callable
+from cryptography.fernet import Fernet
 
 from contacts import AddressBook, Record, InvalidPropertyFormatError
 from notes import NoteBook, Note
@@ -637,53 +639,153 @@ def handle_find_notes(args: list[str], notebook: NoteBook) -> str:
     return output if output else "No Notes."
 
 
-def load_store(path: str) -> dict:
-    """Load app objects from the Pickle-serialized data file.
+@input_error
+def handle_encryption(args: list[str], config: dict) -> str:
+    """Handle encryption command.
+
+    Activate/deactivate encryption for storage file.
+
+    Args:
+        args (list[str]): List with raw cmd arguments.
+            Expected: [flag].
+        notebook (NoteBook): NoteBook object.
+
+    Returns:
+        str: Operation result message.
+
+    Raises:
+        InvalidCmdArgsCountError: If command has invalid argument count.
+    """
+    try:
+        flag, *_ = args
+    except:
+        raise InvalidCmdArgsCountError
+
+    flag = flag.lower();
+    if flag == "on" and config["encryption_key"] is None:
+        key = Fernet.generate_key().decode()
+    elif flag == "off":
+        key = None
+    else:
+        raise InvalidCmdArgTypeError
+
+    config["encryption_key"] = key
+    return f"Encryption status: {flag}."
+
+
+def load_store(path: str, cfg_path: str) -> dict:
+    """Load app data from the encrypted/plain Pickle-serialized file.
 
     Args:
         path (str): Path to the data file.
+        cfg_path (str): Path to the config file.
 
     Returns:
-        dict: Restored objects or empty objects on file access error.
+        dict: Restored objects or empty objects on error.
     """
+    cfg = {"encryption_key": None}
+    key = None
+    recreate_config = False
+
+    # Try to load encryption key from config.json
+    try:
+        with open(cfg_path, "r", encoding="utf-8") as fh:
+            config = json.load(fh)
+        key = config.get("encryption_key")
+        if key is not None and not (isinstance(key, str) and str):
+            raise ValueError
+    except FileNotFoundError:
+        print(f"INFO: Config `{cfg_path}` wasn't found.")
+        recreate_config = True
+    except (OSError, json.JSONDecodeError, ValueError):
+        print(
+            f"ERROR: There was a problem reading `{cfg_path}` config file.\n"
+            "        To prevent potential data loss, please fix issues or delete file."
+        )
+        return None
+
+    cfg["encryption_key"] = key
+
+    if recreate_config:
+        try:
+            with open(cfg_path, "w", encoding="utf-8") as fh:
+                json.dump(cfg, fh, indent=4)
+                print(f"INFO: Created empty `{cfg_path}` config file.")
+        except OSError as e:
+            print(f"ERROR: There was a problem creating `{cfg_path}` config file.")
+            return None
+
     data = {}
+
+    # Open data file for reading
     try:
         with open(path, "rb") as fh:
-            data = pickle.load(fh)
+            # If key is None, then load as unencrypted file
+            if key is None:
+                data = pickle.load(fh)
+            else:
+                # Create Fernet object and decrypt
+                fernet = Fernet(key.encode())
+                encrypted_data = fh.read()
+                decrypted_data = fernet.decrypt(encrypted_data)
+                data = pickle.loads(decrypted_data)
     except FileNotFoundError:
         print(f"INFO: File `{path}` wasn't found. Starting with empty app data.")
     except OSError:
         print(
             f"ERROR: There was a problem reading `{path}` file. "
-            "Starting with empty app data.\n"
-            "Be careful, since your existing app data may be overwritten."
+            "        To prevent potential data loss, please fix issues."
+            "        Or delete file if you want to start with empty app data."
         )
+        return None
 
+    data.setdefault("config", cfg)
+    data.setdefault("meta", {"NoteBook.id_iter": 1})
     data.setdefault("book", AddressBook())
     data.setdefault("notebook", NoteBook())
-    data.setdefault("NoteBook.id_iter", 1)
 
-    NoteBook.reset_id(data["NoteBook.id_iter"] + 1)
+    NoteBook.reset_id(data["meta"]["NoteBook.id_iter"] + 1)
 
     return data
 
 
 @file_error
-def save_store(data: dict, path: str) -> str:
-    """Save app objects to the Pickle-serialized data file.
+def save_store(data: dict, path: str, cfg_path: str) -> str:
+    """Save app data to the encrypted/plain Pickle-serialized file.
 
     Args:
-        data (dict): Dict with app object to save.
+        data (dict): Dict with app data to save.
         path (str): Path to the data file.
+        cfg_path (str): Path to the config file.
 
     Returns:
         str: Operation result message.
     """
-    data["NoteBook.id_iter"] = NoteBook.last_id
+    data["meta"]["NoteBook.id_iter"] = NoteBook.last_id
+
+    key = data["config"]["encryption_key"]
+
+    # Save config
+    try:
+        with open(cfg_path, "w", encoding="utf-8") as fh:
+            json.dump(data["config"], fh, indent=4)
+    except OSError as e:
+        print(f"ERROR: There was a problem saving `{cfg_path}` config file.")
+        return None
 
     try:
         with open(path, "wb") as fh:
-            pickle.dump(data, fh)
+            if key is None:
+                pickle.dump(data, fh)
+            else:
+                # Create Fernet and encrypt
+                fernet = Fernet(key.encode())
+                serialized_data = pickle.dumps(data)
+                encrypted_data = fernet.encrypt(serialized_data)
+                fh.write(encrypted_data)
+
     except OSError as e:
-        raise OSError(f"ERROR: Failed to save data in `{path}` file.") from e
-    return f"Data was saved in `{path}` file."
+        raise OSError(f"ERROR: Failed to save app data in `{path}` file.") from e
+    if key is None:
+        return f"App data was saved in `{path}` file."
+    return f"App data was encrypted and saved in `{path}` file."

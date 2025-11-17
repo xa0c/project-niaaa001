@@ -1,4 +1,6 @@
 import csv
+import sys
+
 try:
     import readline
 except ImportError:
@@ -7,6 +9,7 @@ except ImportError:
 import core
 
 STORE_PATH = "store.bin"
+CONFIG_PATH = "config.json"
 MSG_HELP = """\
 DESCRIPTION:
     This script provides CLI for contact management.
@@ -78,6 +81,7 @@ CMD_CFG = {
     "find-records": (1, 1),
     "find-notes": (1, 1),
     "tag": (1, 3),
+    "encryption": (1, 1),
 }
 
 
@@ -112,7 +116,9 @@ def parse_input(user_input: str) -> tuple[str, list[str]]:
 
 def main():
     print("Welcome to the assistant bot!\nType `help` to learn more about available commands.")
-    data = core.load_store(STORE_PATH)
+    data = core.load_store(STORE_PATH, CONFIG_PATH)
+    if data is None:
+        sys.exit(1)
 
     # Store functions for easier command handling
     cmd_funcs = {
@@ -129,6 +135,7 @@ def main():
         "find-records": core.handle_find_records,
         "find-notes": core.handle_find_notes,
         "tag": core.handle_tag,
+        "encryption": core.handle_encryption,
     }
 
     while True:
@@ -148,7 +155,7 @@ def main():
         # Handle commands
         match cmd:
             case "exit" | "close":
-                print(core.save_store(data, STORE_PATH))
+                print(core.save_store(data, STORE_PATH, CONFIG_PATH))
                 print("Exiting program. Good bye!")
                 break
             case "hello":
@@ -157,13 +164,16 @@ def main():
                 print(MSG_HELP)
             case "new-record" | "records" | "birthdays" | "find-records" | "phone":
                 print(cmd_funcs[cmd](args, data["book"]))
-                core.save_store(data, STORE_PATH)
+                core.save_store(data, STORE_PATH, CONFIG_PATH)
             case "address" | "email" | "birthday" | "photo":
                 print(cmd_funcs[cmd](cmd, args, data["book"]))
-                core.save_store(data, STORE_PATH)
+                core.save_store(data, STORE_PATH, CONFIG_PATH)
             case "new-note" | "notes" | "find-notes" | "tag":
                 print(cmd_funcs[cmd](args, data["notebook"]))
-                core.save_store(data, STORE_PATH)
+                core.save_store(data, STORE_PATH, CONFIG_PATH)
+            case "encryption":
+                print(cmd_funcs[cmd](args, data["config"]))
+                core.save_store(data, STORE_PATH, CONFIG_PATH)
             case _:
                 print("ERROR: Unknown command. Try again.")
 
