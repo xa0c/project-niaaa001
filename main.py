@@ -5,9 +5,8 @@ except ImportError:
     pass
 
 import core
-from contacts import AddressBook
 
-FILEPATH = "addressbook.pkl"
+STORE_PATH = "store.bin"
 MSG_HELP = """\
 DESCRIPTION:
     This script provides CLI for contact management.
@@ -78,6 +77,7 @@ CMD_CFG = {
     "birthdays": (0, 1),
     "find-records": (1, 1),
     "find-notes": (1, 1),
+    "tag": (1, 3),
 }
 
 
@@ -112,14 +112,14 @@ def parse_input(user_input: str) -> tuple[str, list[str]]:
 
 def main():
     print("Welcome to the assistant bot!\nType `help` to learn more about available commands.")
-    book = core.load_data(FILEPATH)
+    data = core.load_store(STORE_PATH)
 
     # Store functions for easier command handling
     cmd_funcs = {
         "new-record": core.handle_new_record,
-        # "new-note": core.handle_new_note,
+        "new-note": core.handle_new_note,
         "records": core.handle_records,
-        # "notes": core.handle_notes,
+        "notes": core.handle_notes,
         "phone": core.handle_phone,
         "address": core.handle_record_prop,
         "email": core.handle_record_prop,
@@ -127,7 +127,8 @@ def main():
         "photo": core.handle_record_prop,
         "birthdays": core.handle_birthdays,
         "find-records": core.handle_find_records,
-        #"find-notes": core.handle_find_notes,
+        "find-notes": core.handle_find_notes,
+        "tag": core.handle_tag,
     }
 
     while True:
@@ -147,7 +148,7 @@ def main():
         # Handle commands
         match cmd:
             case "exit" | "close":
-                print(core.save_data(book, FILEPATH))
+                print(core.save_store(data, STORE_PATH))
                 print("Exiting program. Good bye!")
                 break
             case "hello":
@@ -155,11 +156,14 @@ def main():
             case "help":
                 print(MSG_HELP)
             case "new-record" | "records" | "birthdays" | "find-records" | "phone":
-                print(cmd_funcs[cmd](args, book))
-                core.save_data(book, FILEPATH)
+                print(cmd_funcs[cmd](args, data["book"]))
+                core.save_store(data, STORE_PATH)
             case "address" | "email" | "birthday" | "photo":
-                print(cmd_funcs[cmd](cmd, args, book))
-                core.save_data(book, FILEPATH)
+                print(cmd_funcs[cmd](cmd, args, data["book"]))
+                core.save_store(data, STORE_PATH)
+            case "new-note" | "notes" | "find-notes" | "tag":
+                print(cmd_funcs[cmd](args, data["notebook"]))
+                core.save_store(data, STORE_PATH)
             case _:
                 print("ERROR: Unknown command. Try again.")
 
