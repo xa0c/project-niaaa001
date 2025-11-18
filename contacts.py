@@ -460,6 +460,7 @@ class AddressBook(UserDict):
                 continue
 
             bd = rec.birthday.value
+            next_age = today.year - bd.year
             is_feb29 = bd.month == 2 and bd.day == 29
 
             # Determine congratulation date in this year
@@ -474,6 +475,7 @@ class AddressBook(UserDict):
                     congrats_date = bd.replace(year=today.year + 1, month=3, day=1)
                 else:
                     congrats_date = bd.replace(year=today.year + 1)
+                next_age += 1
 
             # Count remaining days
             wait_days_count = (congrats_date - today).days
@@ -484,6 +486,7 @@ class AddressBook(UserDict):
                     "record": rec,
                     "congratulation_date": congrats_date,
                     "wait_days_count": wait_days_count,
+                    "next_age": next_age,
                 })
 
         # Sort results by congratulation_date

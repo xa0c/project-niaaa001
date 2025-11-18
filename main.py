@@ -7,61 +7,11 @@ except ImportError:
     pass
 
 import core
+from man import render_help
+
 
 STORE_PATH = "store.bin"
 CONFIG_PATH = "config.json"
-MSG_HELP = """\
-DESCRIPTION:
-    This script provides CLI for contact management.
-
-USAGE:
-  ##### Object creations:
-    - new-record <name> : Create new Record.
-    - new-note <val> : Create new Note.
-
-  ##### Records collection actions:
-    - records              : Show "cards" for all Records.
-    - records <name>       : Show Record "card".
-    - records <name> <val> : Rename Record.
-    - records <name> ""    : Delete Record.
-
-  ##### Record property actions:
-    Supported properties: address, birthday, email, photo.
-    - <property> <rec_name>       : Show Record's property.
-    - <property> <rec_name> <val> : Set Record's property.
-    - <property> <rec_name> ""    : Unset Record's property.
-
-  ##### Record list actions:
-    Supported lists: phone.
-    - <list> <rec_name>                 : Show all list items.
-    - <list> <rec_name> <val>           : Add new item to the list.
-    - <list> <rec_name> <val> <new_val> : Replace item with new value.
-    - <list> <rec_name> <val> ""        : Delete item from the list.
-
-  ##### Notes collection actions:
-    - notes            : Show all Notes with IDs.
-    - notes <id>       : Show Note.
-    - notes <id> <val> : Update Note.
-    - notes <id> ""    : Delete Note.
-
-  ##### Note list actions:
-    Supported lists: tag.
-    - <list> <note_id>                 : Show all list items
-    - <list> <note_id> <val>           : Add new item to the list.
-    - <list> <note_id> <val> <new_val> : Replace item with new value.
-    - <list> <note_id> <val> ""        : Delete item from the list.
-
-  ##### Other actions:
-    - find-records <val> : Search inside Record fields by keyword.
-    - find-notes <val>   : Search inside Notes fields by keyword.
-    - birthdays [ <days> ] : Show congratulation dates for persons which birthdays are within specified period (7 days by default).
-    - help : Prints this message.
-    - hello : Prints "hello" message.
-    - exit | close : Saves data into the file and quits application.
-
-NOTES:
-    Use double quotes if values contain spaces."""
-
 MSG_BAD_ARG_COUNT = "Wrong number of arguments. Type `help` to read about command usage."
 CMD_CFG = {
     "exit": (0, 0),
@@ -161,7 +111,7 @@ def main():
             case "hello":
                 print("Hello! How can I help you?")
             case "help":
-                print(MSG_HELP)
+                print(render_help())
             case "new-record" | "records" | "birthdays" | "find-records" | "phone":
                 print(cmd_funcs[cmd](args, data["book"]))
                 core.save_store(data, STORE_PATH, CONFIG_PATH)
