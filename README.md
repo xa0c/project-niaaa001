@@ -206,3 +206,9 @@ exit
 ## Contributing
 
 Issues and PRs welcome on GitHub.
+
+---
+
+## License
+
+License: MIT (see `LICENSE` for details).
