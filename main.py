@@ -65,7 +65,8 @@ def parse_input(user_input: str) -> tuple[str, list[str]]:
 
 
 def main():
-    print("Welcome to the assistant bot!\nType `help` to learn more about available commands.")
+    if len(sys.argv) == 1:
+        print("Welcome to the assistant bot!\nType `help` to learn more about available commands.")
     data = core.load_store(STORE_PATH, CONFIG_PATH)
     if data is None:
         sys.exit(1)
@@ -91,7 +92,10 @@ def main():
     while True:
         # Handle empty input, interrupts and parse errors
         try:
-            cmd = input("> ")
+            if len(sys.argv) == 1:
+                cmd = input("> ")
+            else:
+                cmd = " ".join(sys.argv[1:])
             if not cmd:
                 continue
             cmd, args = parse_input(cmd)
@@ -126,7 +130,8 @@ def main():
                 core.save_store(data, STORE_PATH, CONFIG_PATH)
             case _:
                 print("ERROR: Unknown command. Try again.")
-
+        if len(sys.argv) > 1:
+            break
 
 if __name__ == "__main__":
     main()
