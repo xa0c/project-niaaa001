@@ -414,7 +414,7 @@ class AddressBook(UserDict):
         """
         return self.data.get(name)
 
-    def find(self, search_value: str = None) -> list[Record]:
+    def find(self, search_value: str = None) -> dict:
         """Find all Records matching search value.
 
         Searchable fields: name, birthday, phones, email, address.
@@ -425,7 +425,7 @@ class AddressBook(UserDict):
         Returns:
             list[Record]: List of matched Records.
         """
-        records = []
+        records = {}
         search_value = search_value.lower()
         for record in self.values():
             if (
@@ -435,7 +435,7 @@ class AddressBook(UserDict):
                 (record.email and search_value in record.email.value.lower()) or
                 any(search_value in phone.value for phone in record.phones)
             ):
-                records.append(record)
+                records[record.name.value] = record
         return records
 
     def get_upcoming_birthdays(self, days: int) -> list[dict]:

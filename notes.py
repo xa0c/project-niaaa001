@@ -233,7 +233,7 @@ class NoteBook(UserDict):
         """
         return self.data.get(id_)
 
-    def find(self, search_value: str = None) -> list[Note]:
+    def find(self, search_value: str = None) -> dict:
         """Find all Notes matching search value.
 
         Searchable fields: body, tags.
@@ -244,12 +244,12 @@ class NoteBook(UserDict):
         Returns:
             list[Note]: List of matched Notes.
         """
-        notes = []
+        notes = {}
         search_value = search_value.lower()
         for note in self.values():
             if (
                 search_value in note.body.value.lower() or
                 any(search_value in tag.value.lower() for tag in note.tags)
             ):
-                notes.append(note)
+                notes[note.id] = note
         return notes

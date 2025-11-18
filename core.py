@@ -502,7 +502,7 @@ def handle_find_records(args: list[str], book: AddressBook) -> str:
         return f"No Record matches for the `{keyword}` keyword."
 
     # Render all matched Records
-    return render_records(f"Records matching `{keyword}`", book, keyword)
+    return render_records(f"Records matching `{keyword}`", records, keyword)
 
 
 @input_error
@@ -698,7 +698,7 @@ def handle_find_notes(args: list[str], notebook: NoteBook) -> str:
         return f"No Note matches for the `{keyword}` keyword."
 
     # Render all matched Notes
-    return render_notes(f"Records matching `{keyword}`", notebook, keyword)
+    return render_notes(f"Records matching `{keyword}`", notes, keyword)
 
 
 @input_error
