@@ -4,6 +4,7 @@ import pickle
 import re
 from collections.abc import Callable
 
+from collections import defaultdict
 from cryptography.fernet import Fernet
 from rich.console import Console
 from rich.table import Table
@@ -437,6 +438,45 @@ def render_notes(title: str, notes: dict, keyword_highlight: str = None) -> str:
     return pattern.sub(lambda m: f"{BG_MAGENTA}{m.group(0)}{BG_RESET}", output)
 
 
+def render_notes_by_tags(notes: dict) -> str:
+    """Render Notes sorted by Tags tables.
+
+    Args:
+        notes (dict): dict of Notes.
+
+    Returns:
+        str: Rendered Notes sorted by tags tables.
+    """
+    # Collect list of all available tags
+    all_tags = defaultdict(list)
+    for note in notes.values():
+        if note.tags:
+            for tag in note.tags:
+                all_tags[tag.value].append(note)
+
+    output = ""
+    for tag in all_tags:
+        tbox = box.SQUARE
+        table = Table(title=f"[magenta]Notes by Tag: {tag}[/magenta]", border_style="blue", min_width=50, show_lines=True, box=tbox)
+        table.add_column("ID", style="white", no_wrap=True)
+        table.add_column("Body Text", style="cyan", no_wrap=True)
+        table.add_column("Tags", style="yellow")
+        for note in notes.values():
+            for note_tag in note.tags:
+                if note_tag.value == tag:
+                    id_str = str(note.id)
+                    body_str = str(note.body) if note.body else ""
+                    tags_str = " ; ".join(tag.value for tag in note.tags) if note.tags else ""
+                    table.add_row(id_str, body_str, tags_str)
+
+        console = Console(record=True, color_system="standard")
+        with console.capture() as capture:
+            console.print(table)
+        output += capture.get()
+
+    return output
+
+
 @input_error
 def handle_birthdays(args: list[str], book: AddressBook) -> str:
     """Handle birthdays command.
@@ -698,7 +738,29 @@ def handle_find_notes(args: list[str], notebook: NoteBook) -> str:
         return f"No Note matches for the `{keyword}` keyword."
 
     # Render all matched Notes
-    return render_notes(f"Records matching `{keyword}`", notes, keyword)
+    return render_notes(f"Notes matching `{keyword}`", notes, keyword)
+
+
+@input_error
+def handle_sort_by_tags(args: list[str], notebook: NoteBook) -> str:
+    """Handle sort-by-tag command.
+
+    Sort Notes by tags.
+
+    Args:
+        args (list[str]): List with raw cmd arguments.
+            Expected: [tag].
+        notebook (NoteBook): NoteBook object.
+
+    Returns:
+        str: Operation result message or by-tag sorted tables.
+
+    Raises:
+        InvalidCmdArgsCountError: If command has invalid argument count.
+    """
+
+    # Render all matched Notes
+    return render_notes_by_tags(notebook)
 
 
 @input_error

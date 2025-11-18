@@ -30,6 +30,7 @@ CMD_CFG = {
     "photo": (1, 2),
     "birthdays": (0, 1),
     "find-records": (1, 1),
+    "sort-by-tags": (0, 0),
     "find-notes": (1, 1),
     "tag": (1, 3),
     "encryption": (1, 1),
@@ -54,6 +55,7 @@ CMD_SYNONYMS = {
     "find-notes": ["search", "filter"],
     "tag": ["keyword"],
     "encryption": ["privacy", "crypto"],
+    "sort-by-tags": ["category"],
 }
 
 
@@ -141,6 +143,7 @@ def main():
         "find-notes": core.handle_find_notes,
         "tag": core.handle_tag,
         "encryption": core.handle_encryption,
+        "sort-by-tags": core.handle_sort_by_tags,
     }
 
     while True:
@@ -176,7 +179,7 @@ def main():
             case "address" | "email" | "birthday" | "photo":
                 print(cmd_funcs[cmd](cmd, args, data["book"]))
                 core.save_store(data, STORE_PATH, CONFIG_PATH)
-            case "new-note" | "notes" | "find-notes" | "tag":
+            case "new-note" | "notes" | "find-notes" | "tag" | "sort-by-tags":
                 print(cmd_funcs[cmd](args, data["notebook"]))
                 core.save_store(data, STORE_PATH, CONFIG_PATH)
             case "encryption":

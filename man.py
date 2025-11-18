@@ -91,6 +91,7 @@ def render_help() -> str:
         [
             ("find-records <val>", "Search inside Record fields by keyword."),
             ("find-notes <val>", "Search inside Notes fields by keyword."),
+            ("sort-by-tags <val>", "Sort all Notes by Tags."),
             ("birthdays [ <days> ]", "Show congratulation dates for persons which birthdays are within specified period (7 days by default)."),
         ]
     )
