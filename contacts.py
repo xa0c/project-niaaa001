@@ -223,7 +223,10 @@ class Photo(Field):
         try:
             art.image.thumbnail((256, 256), resample=Image.LANCZOS)
             img_byte_arr = io.BytesIO()
-            art.image.save(img_byte_arr, format="JPEG")
+            img = art.image
+            if img.mode == 'RGBA':
+                img = img.convert('RGB')
+            img.save(img_byte_arr, format="JPEG")
         except e:
             raise InvalidPhotoFormatError from e
         self.value = img_byte_arr.getvalue()
@@ -236,7 +239,7 @@ class Photo(Field):
             width_ration (float): Terminal-specific character ratio.
         """
         art = AsciiArt(Image.open(io.BytesIO(self.value)))
-        return utils.get_truecolor_string(art, columns=120, width_ratio=2.125)
+        return utils.get_truecolor_string(art, columns=columns, width_ratio=width_ratio)
 
 
 class Record:
