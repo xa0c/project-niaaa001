@@ -1,2 +1,3 @@
+/config.json
+/store.bin
 __pycache__/
-/addressbook.pkl
