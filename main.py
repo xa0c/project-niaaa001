@@ -1,5 +1,6 @@
 import csv
 import sys
+from collections import defaultdict
 
 try:
     import readline
@@ -32,7 +33,51 @@ CMD_CFG = {
     "find-notes": (1, 1),
     "tag": (1, 3),
     "encryption": (1, 1),
+    "skip": (0, 0),
 }
+
+CMD_SYNONYMS = {
+    "exit": ["quit", "bye", "close"],
+    "hello": ["hi"],
+    "help": ["man"],
+    "new-record": ["new", "create", "touch"],
+    "new-note": ["new", "create", "touch"],
+    "records": ["all", "show", "rename", "delete", "person", "contact", "people"],
+    "notes": ["all", "show", "update", "delete", "text"],
+    "phone": ["number"],
+    "address": ["city", "street", "town", "country", "house"],
+    "email": [],
+    "birthday": [],
+    "photo": ["image", "avatar", "picture"],
+    "birthdays": ["congratulate"],
+    "find-records": ["search", "filter"],
+    "find-notes": ["search", "filter"],
+    "tag": ["keyword"],
+    "encryption": ["privacy", "crypto"],
+}
+
+
+def guess_cmd(cmd: str) -> list:
+    if len(set(cmd)) < 3:
+        return []
+
+    all_sigs = defaultdict(list)
+    all_sig_names = {}
+    for real in CMD_SYNONYMS:
+        all_sigs[frozenset(real)].append(real)
+        all_sig_names[frozenset(real)] = real
+        for syn in CMD_SYNONYMS[real]:
+            all_sigs[frozenset(syn)].append(real)
+            all_sig_names[frozenset(syn)] = syn
+
+    match_scores = []
+    input_sig = set(cmd)
+    for sig, cmds in all_sigs.items():
+        match_score = len(input_sig.intersection(sig))
+        match_scores.append((match_score, tuple(cmds), all_sig_names[sig]))
+
+    match_scores.sort(reverse=True)
+    return [{"input": score[2], "cmds": score[1]} for score in match_scores if score[0] > 2]
 
 
 def parse_input(user_input: str) -> tuple[str, list[str]]:
@@ -55,7 +100,16 @@ def parse_input(user_input: str) -> tuple[str, list[str]]:
     cmd, *input_args = next(reader)
     cmd = cmd.lower()
     if cmd not in CMD_CFG:
-        raise ValueError("Unknown command.")
+        suggestions = guess_cmd(cmd)
+        if not suggestions:
+            raise ValueError("Unknown command.")
+        candidate = suggestions[0]
+        if candidate["input"] not in candidate["cmds"]:
+            print(f"You probably wanted to type `{suggestions[0]["input"]}`, but such command doesn't exist.")
+            print(f"Similar commads: {", ".join(candidate["cmds"])}")
+        else:
+            print(f"Did you mean typing: {", ".join(candidate["cmds"])}?")
+        cmd = "skip"
 
     if not CMD_CFG[cmd][0] <= len(input_args) <= CMD_CFG[cmd][1]:
         raise ValueError(MSG_BAD_ARG_COUNT)
@@ -128,6 +182,8 @@ def main():
             case "encryption":
                 print(cmd_funcs[cmd](args, data["config"]))
                 core.save_store(data, STORE_PATH, CONFIG_PATH)
+            case "skip":
+                continue
             case _:
                 print("ERROR: Unknown command. Try again.")
         if len(sys.argv) > 1:
