@@ -1,8 +1,13 @@
 import functools
 import json
 import pickle
+import re
 from collections.abc import Callable
+
 from cryptography.fernet import Fernet
+from rich.console import Console
+from rich.table import Table
+from rich import box
 
 from contacts import AddressBook, Record, InvalidPropertyFormatError
 from notes import NoteBook, Note
@@ -89,6 +94,7 @@ def input_error(func: Callable) -> Callable:
         try:
             return func(*args, **kwargs)
         except (
+            FileNotFoundError,
             InvalidCmdArgsCountError,
             InvalidCmdArgTypeError,
             InvalidPropertyFormatError,
@@ -168,10 +174,7 @@ def handle_records(args: list[str], book: AddressBook) -> str:
 
     # Handle ShowAll functionality
     if name is None:
-        output = ""
-        for record in book.values():
-            output += render_record_table(record)
-        return output if output else "No Records."
+        return render_records("All Records", book) if book else "No Records."
 
     record = book.get_record(name)
 
@@ -181,7 +184,7 @@ def handle_records(args: list[str], book: AddressBook) -> str:
 
     # Handle Show functionality
     if value is None:
-        return render_record_table(record)
+        return render_records(str(record.name), {0: record})
 
     # Handle Delete functionality
     if value == "":
@@ -234,8 +237,7 @@ def handle_phone(args: list[str], book: AddressBook) -> str:
 
     # Handle Get functionality
     if value is None:
-        output = "\n".join(phone.value for phone in record.phones)
-        return output if output else f"No phones found for the `{name}` Record."
+        return render_phones(record)
 
     # Handle Add functionality
     if replace_value is None:
@@ -310,8 +312,57 @@ def handle_record_prop(prop: str, args: list[str], book: AddressBook) -> str:
     return f"Set {prop} to `{value}` for the `{name}` Record."
 
 
-def render_record_table(record: Record) -> str:
-    """Render specified Record "view".
+def render_phones(record: Record) -> str:
+    """Render phones table for the specified Record.
+
+    Args:
+        record (Record): Record with phones.
+
+    Returns:
+        str: Rendered phones table.
+    """
+    title = f"{record.name} : Phone Numbers"
+    tbox = box.SQUARE
+    table = Table(title=title, border_style="blue", min_width=50, show_lines=True, box=tbox)
+    table.add_column("", style="white", no_wrap=True)
+    table.add_column("Phone Number", style="cyan", no_wrap=True)
+    for i, phone in enumerate(record.phones):
+        table.add_row(str(i), phone.value)
+
+    console = Console(record=True, color_system="standard")
+    with console.capture() as capture:
+        console.print(table)
+    return capture.get()
+
+
+def render_birthdays(title: str, birthdays: list) -> str:
+    """Render birthdays dict.
+
+    Args:
+        birthdays (dict): Dictionary with Record birthday info.
+
+    Returns:
+        str: Rendered birthdays.
+    """
+    tbox = box.SQUARE
+    table = Table(title=title, border_style="blue", min_width=50, show_lines=True, box=tbox)
+    table.add_column("Name", style="white", no_wrap=True)
+    table.add_column("Congratulation Date", style="yellow", no_wrap=True)
+    table.add_column("Days Left", style="cyan", no_wrap=True)
+    table.add_column("Next Birthday Age", style="yellow", no_wrap=True)
+    for row in birthdays:
+        name = str(row["record"].name)
+        congrats_date = str(row["congratulation_date"])
+        table.add_row(name, congrats_date, str(row["wait_days_count"]), str(row["next_age"]))
+
+    console = Console(record=True, color_system="standard")
+    with console.capture() as capture:
+        console.print(table)
+    return capture.get()
+
+
+def render_records(title: str, records: dict, keyword_highlight: str = None) -> str:
+    """Render Records table.
 
     Args:
         record (Record): Record object.
@@ -319,41 +370,71 @@ def render_record_table(record: Record) -> str:
     Returns:
         str: Rendered Record "view".
     """
-    output = "/" + '═' * 30 + "\\\n"
-    output += "│" + f" Name: {record.name}".ljust(30) + "│\n"
-    if record.birthday is not None:
-        output += "│" + f" Birthday: {record.birthday}".ljust(30) + "│\n"
-    if record.address is not None:
-        output += "│" + f" Address: {record.address}".ljust(30) + "│\n"
-    if record.email is not None:
-        output += "│" + f" Email: {record.email}".ljust(30) + "│\n"
-    output += "├" + "─" * 30 + "┤\n"
-    output += "│" + "Phones".center(30) + "│\n"
-    output += "│" + "-" * 30 + "│\n"
+    tbox = box.SQUARE
+    table = Table(title=title, border_style="blue", min_width=50, show_lines=True, box=tbox)
+    table.add_column("Name", style="white", no_wrap=True)
+    table.add_column("Birthday", style="yellow", no_wrap=True)
+    table.add_column("Address", style="cyan")
+    table.add_column("Email", style="yellow", no_wrap=True)
+    table.add_column("Phone Numbers", style="cyan")
+    for record in records.values():
+        name_str = str(record.name)
+        birthday_str = str(record.birthday) if record.birthday else ""
+        address_str = str(record.address) if record.address else ""
+        email_str = str(record.email) if record.email else ""
+        phones_str = " ; ".join(phone.value for phone in record.phones) if record.phones else ""
+        table.add_row(name_str, birthday_str, address_str, email_str, phones_str)
 
-    for phone in record.phones:
-        output += "│ " + str(phone).ljust(29) + "│\n"
-    output += "└" + "─" * 30 + "┘\n"
-    return output
+    console = Console(record=True, color_system="standard")
+    with console.capture() as capture:
+        console.print(table)
+    output = capture.get()
+
+    if not keyword_highlight:
+        return output
+
+    BG_MAGENTA = "\x1b[45m"  # set background to magenta
+    BG_RESET  = "\x1b[49m"  # reset only background (keeps other styles)
+
+    # Highlight all occurrences, except those which start with `
+    pattern = re.compile(rf"(?<!`){re.escape(keyword_highlight)}")
+    return pattern.sub(lambda m: f"{BG_MAGENTA}{m.group(0)}{BG_RESET}", output)
 
 
-def render_note_table(note: Note) -> str:
-    """Render specified Note "view".
+def render_notes(title: str, notes: dict, keyword_highlight: str = None) -> str:
+    """Render Notes table.
 
     Args:
-        note (Note): Note object.
+        notes (dict): dict of Notes.
 
     Returns:
-        str: Rendered Note "view".
+        str: Rendered Notes table.
     """
-    output = "/" + '═' * 60 + "\\\n"
-    output += "│" + f" ID: {note.id}".ljust(60) + "│\n"
-    if note.tags:
-        output += "│" + f" Tags: {' ; '.join(t.value for t in note.tags)}".ljust(60) + "│\n"
-    output += "├" + "─" * 60 + "┤\n"
-    output += "│" + f"{note.body}".ljust(60) + "│\n"
-    output += "└" + "─" * 60 + "┘\n"
-    return output
+    tbox = box.SQUARE
+    table = Table(title=title, border_style="blue", min_width=50, show_lines=True, box=tbox)
+    table.add_column("ID", style="white", no_wrap=True)
+    table.add_column("Body Text", style="cyan", no_wrap=True)
+    table.add_column("Tags", style="yellow")
+    for note in notes.values():
+        id_str = str(note.id)
+        body_str = str(note.body) if note.body else ""
+        tags_str = " ; ".join(tag.value for tag in note.tags) if note.tags else ""
+        table.add_row(id_str, body_str, tags_str)
+
+    console = Console(record=True, color_system="standard")
+    with console.capture() as capture:
+        console.print(table)
+    output = capture.get()
+
+    if not keyword_highlight:
+        return output
+
+    BG_MAGENTA = "\x1b[45m"  # set background to magenta
+    BG_RESET  = "\x1b[49m"  # reset only background (keeps other styles)
+
+    # Highlight all occurrences, except those which start with `
+    pattern = re.compile(rf"(?<!`){re.escape(keyword_highlight)}")
+    return pattern.sub(lambda m: f"{BG_MAGENTA}{m.group(0)}{BG_RESET}", output)
 
 
 @input_error
@@ -389,18 +470,8 @@ def handle_birthdays(args: list[str], book: AddressBook) -> str:
     except ValueError as e:
         raise InvalidCmdArgTypeError from e
 
-    result = book.get_upcoming_birthdays(days)
-
-    # Assemble table
-    output_list = []
-    for row in result:
-        s = str(row["congratulation_date"])
-        s += f" (in {row['wait_days_count']} "
-        s += "day): " if row["wait_days_count"] == 1 else "days): "
-        s += str(row["record"].name)
-        output_list.append(s)
-
-    return "\n".join(output_list)
+    birthdays = book.get_upcoming_birthdays(days)
+    return render_birthdays(f"Upcoming Birthdays in Next {days} Days", birthdays)
 
 
 @input_error
@@ -430,11 +501,8 @@ def handle_find_records(args: list[str], book: AddressBook) -> str:
     if not records:
         return f"No Record matches for the `{keyword}` keyword."
 
-    # Render all matched Record "views"
-    output = ""
-    for record in records:
-        output += render_record_table(record)
-    return output if output else "No Records."
+    # Render all matched Records
+    return render_records(f"Records matching `{keyword}`", book, keyword)
 
 
 @input_error
@@ -498,10 +566,7 @@ def handle_notes(args: list[str], notebook: NoteBook) -> str:
 
     # Handle ShowAll functionality
     if id_ is None:
-        output = ""
-        for note in notebook.values():
-            output += render_note_table(note)
-        return output if output else "No Notes."
+        return render_notes("All Notes", notebook) if notebook else "No Notes."
 
     # Validate `id` argument
     try:
@@ -519,7 +584,7 @@ def handle_notes(args: list[str], notebook: NoteBook) -> str:
 
     # Handle Show functionality
     if body is None:
-        return render_note_table(note)
+        return render_notes("", {0: note})
 
     # Handle Delete functionality
     if body == "":
@@ -632,11 +697,8 @@ def handle_find_notes(args: list[str], notebook: NoteBook) -> str:
     if not notes:
         return f"No Note matches for the `{keyword}` keyword."
 
-    # Render all matched Note "views"
-    output = ""
-    for note in notes:
-        output += render_note_table(note)
-    return output if output else "No Notes."
+    # Render all matched Notes
+    return render_notes(f"Records matching `{keyword}`", notebook, keyword)
 
 
 @input_error

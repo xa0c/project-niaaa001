@@ -84,12 +84,13 @@ class Tag(Field):
             raise InvalidTagFormatError
         self.value = value
 
+
 class Note:
     """Note for storing text content with tags.
 
     Attributes:
         id (int)
-        body (str)
+        body (Field)
         tags (list[Tag])
 
     Args:
@@ -99,7 +100,7 @@ class Note:
 
     def __init__(self, body: str, tags: list[str] = None):
         self.id = None
-        self.body = body
+        self.body = Body(body)
         self.tags = tags.copy() if tags else []
 
     def __str__(self):
