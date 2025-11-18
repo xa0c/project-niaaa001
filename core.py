@@ -397,7 +397,7 @@ def render_records(title: str, records: dict, keyword_highlight: str = None) -> 
     BG_RESET  = "\x1b[49m"  # reset only background (keeps other styles)
 
     # Highlight all occurrences, except those which start with `
-    pattern = re.compile(rf"(?<!`){re.escape(keyword_highlight)}")
+    pattern = re.compile(rf"(?<!`){re.escape(keyword_highlight)}", re.IGNORECASE)
     return pattern.sub(lambda m: f"{BG_MAGENTA}{m.group(0)}{BG_RESET}", output)
 
 
@@ -433,7 +433,7 @@ def render_notes(title: str, notes: dict, keyword_highlight: str = None) -> str:
     BG_RESET  = "\x1b[49m"  # reset only background (keeps other styles)
 
     # Highlight all occurrences, except those which start with `
-    pattern = re.compile(rf"(?<!`){re.escape(keyword_highlight)}")
+    pattern = re.compile(rf"(?<!`){re.escape(keyword_highlight)}", re.IGNORECASE)
     return pattern.sub(lambda m: f"{BG_MAGENTA}{m.group(0)}{BG_RESET}", output)
 
 
